@@ -3,22 +3,30 @@ HeatTrick Backend - Localized Weather Ingestion & Thermal Stress API
 College Research Project: India Localized Heatwave Early Warning & Thermal Stress Assessment
 """
 
+import asyncio
+import time
 from datetime import datetime, timezone
+
+import httpx
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import httpx
+
 
 app = FastAPI(
     title="HeatTrick API",
-    description="Backend API for Heatwave Early Warning and Thermal Stress Assessment in India",
-    version="0.2.0",
+    description=(
+        "Backend API for Heatwave Early Warning and "
+        "Thermal Stress Assessment in India"
+    ),
+    version="0.2.1",
 )
 
-# Configure CORS to allow frontend communication during development
+# Allow the local frontend and deployed Vercel frontend.
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://heat-trick.vercel.app",
 ]
 
 app.add_middleware(
@@ -28,6 +36,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# In-memory cache: reuse successful results for five minutes.
+WEATHER_CACHE_TTL = 300
+weather_cache = {}
 
 
 class HealthResponse(BaseModel):
@@ -86,10 +98,7 @@ def read_root():
 
 @app.get("/api/health", response_model=HealthResponse)
 def get_health() -> HealthResponse:
-    """
-    Health check endpoint to verify backend service status.
-    Expected response: {"status": "ok", "app": "HeatTrick"}
-    """
+    """Verify that the HeatTrick backend is running."""
     return HealthResponse(status="ok", app="HeatTrick")
 
 
@@ -109,66 +118,134 @@ async def get_weather(
     ),
 ) -> WeatherResponse:
     """
-    Retrieve real-time meteorological observations and 7-day numerical forecast
-    from Open-Meteo for the requested geographical coordinates.
+    Retrieve current weather and a seven-day forecast from Open-Meteo.
+    Successful responses are cached briefly to reduce repeated API calls.
     """
+
+    # Round coordinates slightly so nearby duplicate requests can share cache.
+    cache_key = (round(latitude, 3), round(longitude, 3))
+    now = time.monotonic()
+    cached = weather_cache.get(cache_key)
+
+    if cached and now - cached[0] < WEATHER_CACHE_TTL:
+        return cached[1]
+
     url = "https://api.open-meteo.com/v1/forecast"
+
     params = {
         "latitude": latitude,
         "longitude": longitude,
         "current": (
             "temperature_2m,relative_humidity_2m,apparent_temperature,"
-            "dew_point_2m,is_day,precipitation,wind_speed_10m,direct_normal_irradiance"
+            "dew_point_2m,is_day,precipitation,wind_speed_10m,"
+            "direct_normal_irradiance"
         ),
         "daily": (
-            "temperature_2m_max,temperature_2m_min,apparent_temperature_max,"
-            "apparent_temperature_min,precipitation_sum,wind_speed_10m_max"
+            "temperature_2m_max,temperature_2m_min,"
+            "apparent_temperature_max,apparent_temperature_min,"
+            "precipitation_sum,wind_speed_10m_max"
         ),
         "timezone": "auto",
         "wind_speed_unit": "ms",
     }
 
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url, params=params)
-            resp.raise_for_status()
-            data = resp.json()
-    except httpx.TimeoutException:
-        raise HTTPException(
-            status_code=504,
-            detail="Upstream timeout: Open-Meteo weather service did not respond within 10 seconds.",
-        )
-    except httpx.HTTPStatusError as err:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Upstream error: Open-Meteo weather service returned HTTP {err.response.status_code}.",
-        )
-    except httpx.RequestError:
+    data = None
+
+    # Retry temporary timeouts, rate limits and provider server errors.
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(20.0, connect=10.0)
+            ) as client:
+                response = await client.get(url, params=params)
+
+            if (
+                response.status_code == 429
+                or response.status_code >= 500
+            ):
+                if attempt < 2:
+                    await asyncio.sleep(1.5 * (attempt + 1))
+                    continue
+
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        "Open-Meteo is temporarily rate-limited or "
+                        "unavailable. Please try again later."
+                    ),
+                )
+
+            response.raise_for_status()
+            data = response.json()
+            break
+
+        except HTTPException:
+            raise
+
+        except httpx.TimeoutException:
+            if attempt < 2:
+                await asyncio.sleep(1.5 * (attempt + 1))
+                continue
+
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    "Open-Meteo did not respond after multiple attempts. "
+                    "Please try again shortly."
+                ),
+            )
+
+        except httpx.HTTPStatusError as err:
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "Open-Meteo returned HTTP "
+                    f"{err.response.status_code}."
+                ),
+            )
+
+        except httpx.RequestError:
+            if attempt < 2:
+                await asyncio.sleep(1.5 * (attempt + 1))
+                continue
+
+            raise HTTPException(
+                status_code=503,
+                detail="Unable to connect to the Open-Meteo service.",
+            )
+
+        except ValueError:
+            raise HTTPException(
+                status_code=502,
+                detail="Open-Meteo returned invalid JSON.",
+            )
+
+    if data is None:
         raise HTTPException(
             status_code=503,
-            detail="Network error: Unable to connect to Open-Meteo weather service.",
-        )
-    except Exception as err:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Unexpected error processing weather data: {str(err)}",
+            detail="Weather data is temporarily unavailable.",
         )
 
-    # Parse and validate response structure
+    # Validate the response structure before constructing our models.
     raw_current = data.get("current")
     raw_daily = data.get("daily")
-    if not raw_current or not raw_daily:
+
+    if not isinstance(raw_current, dict) or not isinstance(raw_daily, dict):
         raise HTTPException(
             status_code=502,
-            detail="Invalid payload structure received from Open-Meteo.",
+            detail="Invalid weather response received from Open-Meteo.",
         )
 
-    # Compile units dictionary combining current and daily units
     units: dict[str, str] = {}
-    if isinstance(data.get("current_units"), dict):
-        units.update(data["current_units"])
-    if isinstance(data.get("daily_units"), dict):
-        units.update(data["daily_units"])
+
+    current_units = data.get("current_units")
+    daily_units = data.get("daily_units")
+
+    if isinstance(current_units, dict):
+        units.update(current_units)
+
+    if isinstance(daily_units, dict):
+        units.update(daily_units)
 
     current_model = CurrentWeather(
         time=str(raw_current.get("time", "")),
@@ -177,7 +254,9 @@ async def get_weather(
         apparent_temperature=raw_current.get("apparent_temperature"),
         dew_point_2m=raw_current.get("dew_point_2m"),
         wind_speed_10m=raw_current.get("wind_speed_10m"),
-        direct_normal_irradiance=raw_current.get("direct_normal_irradiance"),
+        direct_normal_irradiance=raw_current.get(
+            "direct_normal_irradiance"
+        ),
         is_day=raw_current.get("is_day"),
         precipitation=raw_current.get("precipitation"),
     )
@@ -186,8 +265,12 @@ async def get_weather(
         time=raw_daily.get("time", []),
         temperature_2m_max=raw_daily.get("temperature_2m_max", []),
         temperature_2m_min=raw_daily.get("temperature_2m_min", []),
-        apparent_temperature_max=raw_daily.get("apparent_temperature_max", []),
-        apparent_temperature_min=raw_daily.get("apparent_temperature_min", []),
+        apparent_temperature_max=raw_daily.get(
+            "apparent_temperature_max", []
+        ),
+        apparent_temperature_min=raw_daily.get(
+            "apparent_temperature_min", []
+        ),
         wind_speed_10m_max=raw_daily.get("wind_speed_10m_max", []),
         precipitation_sum=raw_daily.get("precipitation_sum", []),
     )
@@ -202,9 +285,23 @@ async def get_weather(
         retrieved_at=datetime.now(timezone.utc).isoformat(),
     )
 
-    return WeatherResponse(
+    result = WeatherResponse(
         current=current_model,
         daily=daily_model,
         units=units,
         metadata=metadata_model,
     )
+
+    # Cache only successful responses.
+    weather_cache[cache_key] = (time.monotonic(), result)
+
+    # Remove expired entries to prevent unbounded cache growth.
+    expired_keys = [
+        key
+        for key, value in weather_cache.items()
+        if time.monotonic() - value[0] >= WEATHER_CACHE_TTL
+    ]
+    for key in expired_keys:
+        weather_cache.pop(key, None)
+
+    return result
