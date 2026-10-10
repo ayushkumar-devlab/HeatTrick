@@ -29,7 +29,8 @@ export function Navbar({ health, onRefreshHealth }: NavbarProps) {
               </span>
             </div>
             <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">
-              A Data-Driven Framework for Localized Heatwave Early Warning & Human Thermal Stress Risk Assessment in India
+              A Data-Driven Framework for Localized Heatwave Early Warning &
+              Human Thermal Stress Risk Assessment in India
             </p>
           </div>
         </div>
@@ -37,24 +38,26 @@ export function Navbar({ health, onRefreshHealth }: NavbarProps) {
         {/* Backend Status & Controls */}
         <div className="flex items-center gap-3 self-stretch md:self-auto justify-between md:justify-end">
           <div className="flex items-center gap-2">
-            {health.status === 'checking' && (
+            {health.status === "checking" && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300 text-xs">
                 <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-400" />
                 <span>Checking backend...</span>
               </div>
             )}
 
-            {health.status === 'ok' && (
+            {health.status === "ok" && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-emerald-300 text-xs font-mono">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                 <span>FastAPI Online</span>
                 {health.latencyMs !== undefined && (
-                  <span className="text-emerald-500/80">({health.latencyMs}ms)</span>
+                  <span className="text-emerald-500/80">
+                    ({health.latencyMs}ms)
+                  </span>
                 )}
               </div>
             )}
 
-            {health.status === 'error' && (
+            {health.status === "error" && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-950/30 border border-rose-500/40 text-rose-300 text-xs font-mono">
                 <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
                 <span>Backend Offline</span>
@@ -63,22 +66,24 @@ export function Navbar({ health, onRefreshHealth }: NavbarProps) {
 
             <button
               onClick={onRefreshHealth}
-              disabled={health.status === 'checking'}
+              disabled={health.status === "checking"}
               title="Ping backend /api/health endpoint"
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
             >
               <RefreshCw
-                className={`w-3.5 h-3.5 ${health.status === 'checking' ? 'animate-spin' : ''}`}
+                className={`w-3.5 h-3.5 ${health.status === "checking" ? "animate-spin" : ""}`}
               />
             </button>
           </div>
 
           <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-400 border-l border-slate-800 pl-3">
             <Server className="w-3.5 h-3.5 text-slate-500" />
-            <span className="font-mono text-[11px] text-slate-400">127.0.0.1:8000</span>
+            <span className="font-mono text-[11px] text-slate-400">
+              heat-trick-api.onrender.com
+            </span>
           </div>
         </div>
       </div>
     </header>
-  )
+  );
 }
