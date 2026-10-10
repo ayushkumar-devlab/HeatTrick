@@ -1,0 +1,100 @@
+import type { Station } from '../types'
+
+export const REFERENCE_STATIONS: Station[] = [
+  {
+    id: 'DEL-01',
+    name: 'New Delhi (Safdarjung)',
+    state: 'Delhi (NCR)',
+    zone: 'Northern Plains',
+    latitude: 28.5833,
+    longitude: 77.2083,
+    elevationM: 216,
+    imdCriteriaType: 'Plains',
+  },
+  {
+    id: 'NAG-02',
+    name: 'Nagpur (Sonegaon)',
+    state: 'Maharashtra (Vidarbha)',
+    zone: 'Central Plateau',
+    latitude: 21.0922,
+    longitude: 79.0558,
+    elevationM: 310,
+    imdCriteriaType: 'Plains',
+  },
+  {
+    id: 'KOL-03',
+    name: 'Kolkata (Alipore)',
+    state: 'West Bengal',
+    zone: 'Eastern Delta & Coastal',
+    latitude: 22.5333,
+    longitude: 88.3333,
+    elevationM: 6,
+    imdCriteriaType: 'Coastal',
+  },
+  {
+    id: 'AHM-04',
+    name: 'Ahmedabad',
+    state: 'Gujarat',
+    zone: 'Western Arid',
+    latitude: 23.0333,
+    longitude: 72.5833,
+    elevationM: 53,
+    imdCriteriaType: 'Plains',
+  },
+  {
+    id: 'CHE-05',
+    name: 'Chennai (Meenambakkam)',
+    state: 'Tamil Nadu',
+    zone: 'Southern Coastal',
+    latitude: 13.0000,
+    longitude: 80.1833,
+    elevationM: 16,
+    imdCriteriaType: 'Coastal',
+  },
+  {
+    id: 'HYD-06',
+    name: 'Hyderabad (Begumpet)',
+    state: 'Telangana',
+    zone: 'Deccan Plateau',
+    latitude: 17.4500,
+    longitude: 78.4667,
+    elevationM: 531,
+    imdCriteriaType: 'Plains',
+  },
+  {
+    id: 'SHI-07',
+    name: 'Shimla',
+    state: 'Himachal Pradesh',
+    zone: 'Hilly Region',
+    latitude: 31.1048,
+    longitude: 77.1734,
+    elevationM: 2206,
+    imdCriteriaType: 'Hilly',
+  },
+  {
+    // Coordinates: Bengaluru HAL Airport / BBMP reference centroid
+    // Source: WGS84 geocoded from OpenStreetMap (Bengaluru, Karnataka, India)
+    // Note: Grid-based model estimate — NOT an official IMD surface observatory.
+    id: 'BLR-08',
+    name: 'Bengaluru',
+    state: 'Karnataka',
+    zone: 'Deccan Plateau',
+    latitude: 12.9716,
+    longitude: 77.5946,
+    elevationM: 920,
+    imdCriteriaType: 'Plains',
+  },
+  {
+    // Coordinates: J.P. Nagar neighbourhood centroid, Bengaluru South
+    // Source: WGS84 geocoded from OpenStreetMap (J.P. Nagar, BBMP Zone 5)
+    // Note: Grid-based model estimate — NOT an official IMD surface observatory.
+    id: 'BLR-JPN-09',
+    name: 'J.P. Nagar, Bengaluru',
+    state: 'Karnataka (Bengaluru South)',
+    zone: 'Deccan Plateau',
+    latitude: 12.9071,
+    longitude: 77.5856,
+    elevationM: 908,
+    imdCriteriaType: 'Plains',
+  },
+]
