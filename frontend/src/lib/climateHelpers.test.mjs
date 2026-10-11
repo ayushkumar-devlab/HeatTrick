@@ -3,6 +3,7 @@ import test from 'node:test'
 import { dewPointFromTRh } from './dewPoint.ts'
 import { forecastPeak } from './forecast.ts'
 import { heatwaveVerdict, terrainThreshold } from './heatwave.ts'
+import { formatChartAxisDate, formatChartDate, selectValueLabelIndexes } from './chartLabels.ts'
 
 test('maps the existing IMD terrain categories to base thresholds', () => {
   assert.equal(terrainThreshold('Plains'), 40)
@@ -61,4 +62,17 @@ test('returns no dew point for missing or out-of-range inputs', () => {
 test('finds the real forecast peak and skips missing values', () => {
   assert.equal(forecastPeak([null, 28.5, 31.2, undefined]), 31.2)
   assert.equal(forecastPeak([null, undefined]), null)
+})
+
+test('formats local-date chart labels without timezone conversion', () => {
+  assert.equal(formatChartDate('2026-10-12'), '12 Oct 2026')
+  assert.equal(formatChartAxisDate('2026-10-12', false), '12 Oct')
+  assert.equal(formatChartAxisDate('2026-10-12', true), 'Mon 12')
+})
+
+test('selects endpoints, peak, and low value labels on narrow charts', () => {
+  assert.deepEqual(selectValueLabelIndexes([10, 12, 8, 11, 9, 13, 7], 360), [0, 5, 6])
+  assert.deepEqual(selectValueLabelIndexes([null, 12, null, 11], 360), [1, 3])
+  assert.deepEqual(selectValueLabelIndexes([null, null], 360), [])
+  assert.deepEqual(selectValueLabelIndexes([1, null, 3], 640), [0, 2])
 })

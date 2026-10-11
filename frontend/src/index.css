@@ -209,6 +209,60 @@ input {
   letter-spacing: -0.015em;
 }
 
+.overview-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(112deg, rgb(var(--color-scene-sand) / 0.7), rgb(var(--color-surface)) 74%);
+}
+
+.overview-hero::before {
+  position: absolute;
+  z-index: 2;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: linear-gradient(180deg, rgb(var(--color-heat-orange)), rgb(var(--color-accent)));
+  content: "";
+}
+
+.overview-hero__copy {
+  position: relative;
+  z-index: 1;
+  max-width: 64%;
+}
+
+.hero-scene {
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+  width: 43%;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, rgb(0 0 0 / 0.25) 18%, rgb(0 0 0) 56%);
+  mask-image: linear-gradient(to right, transparent 0%, rgb(0 0 0 / 0.25) 18%, rgb(0 0 0) 56%);
+}
+
+.hero-scene--banner {
+  width: 38%;
+  max-height: 152px;
+  opacity: 0.68;
+}
+
+.hero-scene__warm-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgb(var(--color-scene-sun) / 0.13);
+}
+
+.view-banner {
+  min-height: 132px;
+}
+
+.view-banner__copy {
+  max-width: 72%;
+}
+
 .stat-tile {
   min-width: min(14rem, 100%);
   border-radius: 0.875rem;
@@ -330,6 +384,23 @@ input {
 }
 
 @media (max-width: 767px) {
+  .overview-hero__copy {
+    max-width: none;
+  }
+
+  .hero-scene--overview {
+    display: none;
+  }
+
+  .hero-scene--banner {
+    width: 34%;
+    opacity: 0.4;
+  }
+
+  .view-banner__copy {
+    max-width: 82%;
+  }
+
   .forecast-day-grid {
     grid-auto-columns: minmax(14rem, 78%);
     grid-auto-flow: column;
@@ -337,6 +408,17 @@ input {
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     padding: 0.25rem 0.1rem 0.75rem;
+  }
+
+  @media (max-width: 420px) {
+    .hero-scene--banner {
+      width: 29%;
+      opacity: 0.28;
+    }
+
+    .view-banner__copy {
+      max-width: 88%;
+    }
   }
 
   .forecast-day-grid > * {

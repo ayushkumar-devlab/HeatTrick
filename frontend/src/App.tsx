@@ -188,6 +188,7 @@ export default function App() {
         )}
         {activeTab === 'thermal-stress' && (
           <ThermalStressView
+            selectedStation={selectedStation}
             weatherState={visibleWeatherState}
           />
         )}
@@ -198,7 +199,12 @@ export default function App() {
             onRefreshWeather={handleRefreshWeather}
           />
         )}
-        {activeTab === 'methodology' && <MethodologyView />}
+        {activeTab === 'methodology' && (
+          <MethodologyView
+            selectedStation={selectedStation}
+            currentTime={visibleWeatherState.data?.current.time}
+          />
+        )}
       </main>
 
       <Footer />

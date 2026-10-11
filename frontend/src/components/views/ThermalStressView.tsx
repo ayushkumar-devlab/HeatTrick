@@ -3,9 +3,12 @@ import { BandBar } from '../charts/BandBar'
 import type { TemperatureBand } from '../charts/types'
 import { dewPointFromTRh } from '../../lib/dewPoint'
 import { calculateHeatIndexCelsius } from '../../utils/heatIndex'
+import type { Station } from '../../types'
+import { ViewBanner } from '../ViewBanner'
 
 interface ThermalStressViewProps {
   weatherState: WeatherState
+  selectedStation: Station
 }
 
 const NOAA_BANDS: TemperatureBand[] = [
@@ -30,7 +33,7 @@ function formatValue(value: number | null | undefined, unit: string) {
     : '—'
 }
 
-export function ThermalStressView({ weatherState }: ThermalStressViewProps) {
+export function ThermalStressView({ weatherState, selectedStation }: ThermalStressViewProps) {
   const current = weatherState.data?.current
   const temperature = current?.temperature_2m
   const humidity = current?.relative_humidity_2m
@@ -39,8 +42,14 @@ export function ThermalStressView({ weatherState }: ThermalStressViewProps) {
 
   return (
     <div className="space-y-6">
+      <ViewBanner
+        title="Thermal stress"
+        description="Heat Index estimated from forecast air temperature and humidity."
+        station={selectedStation}
+        currentTime={current?.time}
+      />
       <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-7">
-        <h2 className="display-title text-2xl font-semibold text-ink">Heat index</h2>
+        <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Heat index</h3>
         {weatherState.isLoading && !weatherState.data ? (
           <p className="mt-3 text-sm text-muted" role="status">Loading weather data…</p>
         ) : weatherState.error && !weatherState.data ? (

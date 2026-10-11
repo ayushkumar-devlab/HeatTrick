@@ -8,11 +8,19 @@ export function useChartWidth<T extends HTMLElement>() {
     const element = ref.current
     if (!element) return
 
+    const updateWidth = () => {
+      setWidth(Math.max(280, element.getBoundingClientRect().width))
+    }
     const observer = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(Math.max(280, entry.contentRect.width))
+      if (entry) updateWidth()
     })
+    updateWidth()
     observer.observe(element)
-    return () => observer.disconnect()
+    window.addEventListener('resize', updateWidth)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updateWidth)
+    }
   }, [])
 
   return { ref, width }

@@ -1,10 +1,26 @@
 import { Database } from 'lucide-react'
+import type { Station } from '../../types'
+import { getHeroPhotoCredits } from '../../lib/heroPhotoCredits'
+import { ViewBanner } from '../ViewBanner'
 
-export function MethodologyView() {
+interface MethodologyViewProps {
+  selectedStation: Station
+  currentTime?: string
+}
+
+export function MethodologyView({ selectedStation, currentTime }: MethodologyViewProps) {
+  const photoCredits = getHeroPhotoCredits()
+
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-border bg-surface p-5 sm:p-7 shadow-sm">
-        <h2 className="display-title text-2xl font-semibold text-ink">Methods and sources</h2>
+      <ViewBanner
+        title="Methods & sources"
+        description="Weather source, calculations, and limitations."
+        station={selectedStation}
+        currentTime={currentTime}
+      />
+      <section className="rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-sm">
+        <h3 className="display-title flex items-center gap-2 font-semibold text-ink"><Database className="h-5 w-5 text-brand" aria-hidden="true" />Weather data</h3>
         <p className="mt-3 max-w-4xl text-sm leading-6 text-ink-soft">
           HeatTrick provides forecast insights for selected coordinates; it is not an official{' '}
           <a href="https://mausam.imd.gov.in/" target="_blank" rel="noopener noreferrer" className="font-medium text-brand underline underline-offset-2">IMD</a>
@@ -12,10 +28,6 @@ export function MethodologyView() {
           <a href="https://ndma.gov.in/" target="_blank" rel="noopener noreferrer" className="font-medium text-brand underline underline-offset-2">NDMA</a>
           {' '}service.
         </p>
-      </section>
-
-      <section className="rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-sm">
-        <h3 className="display-title flex items-center gap-2 font-semibold text-ink"><Database className="h-5 w-5 text-brand" aria-hidden="true" />Weather data</h3>
         <p className="mt-3 text-sm leading-6 text-ink-soft">
           The application retrieves forecast data from MET Norway’s Locationforecast API for the
           selected latitude and longitude. The interface uses the returned 2-metre air temperature,
@@ -56,6 +68,11 @@ export function MethodologyView() {
           </a>
           .
         </p>
+        {photoCredits.length > 0 && (
+          <p className="mt-3 text-sm leading-6 text-ink-soft">
+            Photo credits: {photoCredits.join('; ')}
+          </p>
+        )}
       </section>
 
       <section className="rounded-2xl border border-accent/40 bg-warning-soft p-5 sm:p-6 shadow-sm">

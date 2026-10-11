@@ -1,10 +1,15 @@
+import { CalendarDays, Clock3 } from 'lucide-react'
 import type { ActiveTab, Station, WeatherState } from '../../types'
 import { DailyHighChart } from '../charts/DailyHighChart'
 import { KeyValueList } from '../charts/KeyValueList'
 import type { ChartDay } from '../charts/types'
+import { HeroScene } from '../HeroScene'
 import { dewPointFromTRh } from '../../lib/dewPoint'
 import { forecastPeak } from '../../lib/forecast'
-import { heatwaveVerdict, terrainThreshold } from '../../lib/heatwave'
+import { heatwaveVerdict } from '../../lib/heatwave'
+import { formatChartDate } from '../../lib/chartLabels'
+import { heatBandInk } from '../../lib/temperatureBands'
+import { calculateHeatIndexCelsius } from '../../utils/heatIndex'
 
 interface OverviewViewProps {
   selectedStation: Station
@@ -14,18 +19,6 @@ interface OverviewViewProps {
 }
 
 const LOCATION_TIME_ZONE = 'Asia/Kolkata'
-
-function formatAsOf(timestamp: string | undefined) {
-  if (!timestamp) return null
-  const date = new Date(timestamp)
-  if (Number.isNaN(date.getTime())) return null
-  return date.toLocaleTimeString('en-IN', {
-    timeZone: LOCATION_TIME_ZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  })
-}
 
 function localDate(timestamp: string | undefined) {
   if (!timestamp) return null
@@ -45,6 +38,24 @@ function localDate(timestamp: string | undefined) {
   return year && month && day ? `${year}-${month}-${day}` : null
 }
 
+function formatAsOf(timestamp: string | undefined) {
+  if (!timestamp) return null
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleTimeString('en-IN', {
+    timeZone: LOCATION_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  })
+}
+
+function formatValue(value: number | null | undefined, unit: string) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? `${value.toFixed(1)} ${unit}`
+    : '—'
+}
+
 export function OverviewView({
   selectedStation,
   weatherState,
@@ -62,12 +73,14 @@ export function OverviewView({
     forecastHigh: peak,
     terrain: selectedStation.imdCriteriaType,
   })
-  const dewPoint = dewPointFromTRh(
-    current?.temperature_2m,
-    current?.relative_humidity_2m,
-  )
+  const today = localDate(current?.time)
+  const todayIndex = today ? daily?.time.indexOf(today) ?? -1 : -1
+  const todayHigh = todayIndex >= 0 ? daily?.temperature_2m_max[todayIndex] : null
+  const todayLow = todayIndex >= 0 ? daily?.temperature_2m_min[todayIndex] : null
+  const temperature = current?.temperature_2m
+  const dewPoint = dewPointFromTRh(temperature, current?.relative_humidity_2m)
+  const heatIndex = calculateHeatIndexCelsius(temperature, current?.relative_humidity_2m)
   const rows = [
-    { label: 'Air temperature', value: current?.temperature_2m, unit: '°C' },
     { label: 'Humidity', value: current?.relative_humidity_2m, unit: '%' },
     {
       label: 'Dew point (derived from temperature and humidity)',
@@ -75,22 +88,66 @@ export function OverviewView({
       unit: '°C',
     },
     { label: 'Wind at 10 m', value: current?.wind_speed_10m, unit: 'm/s' },
+    { label: 'Heat Index (estimated)', value: heatIndex, unit: '°C' },
   ]
 
   return (
     <div className="space-y-6">
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,0.8fr)]">
-        <section className="rounded-card border border-border border-l-[6px] border-l-accent bg-surface p-5 shadow-card sm:p-7">
-          <p className="text-sm font-medium text-muted">
-            {selectedStation.name} · {selectedStation.zone} · {selectedStation.elevationM} m
-          </p>
-          <h2 className="display-title mt-3 text-2xl font-semibold leading-tight text-ink sm:text-3xl">
+      <section className="overview-hero rounded-card border border-border p-5 shadow-card sm:p-7">
+        <HeroScene
+          zone={selectedStation.zone}
+          currentTime={current?.time}
+          variant="overview"
+        />
+        <div className="overview-hero__copy">
+          <h2 className="display-title text-2xl font-semibold leading-tight text-ink sm:text-3xl">
             {verdict.headline}
           </h2>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-ink-soft">{verdict.subline}</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
+            This is a basic threshold comparison, not an official IMD classification.
+          </p>
+          {verdict.subline !== 'This is a basic threshold comparison, not an official IMD classification.' && (
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">{verdict.subline}</p>
+          )}
 
-          <div className="mt-6 flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="display-title text-xl font-semibold text-ink">Daily forecast highs</h3>
+          <div className="mt-6 grid gap-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] sm:items-end">
+            <div>
+              <p className="text-sm font-medium text-ink-soft">Air temperature</p>
+              <p
+                className="display-title mt-1 text-6xl font-semibold leading-none tracking-tight tabular-nums sm:text-7xl"
+                style={{
+                  color: typeof temperature === 'number' && Number.isFinite(temperature)
+                    ? heatBandInk(temperature)
+                    : 'rgb(var(--color-muted))',
+                }}
+              >
+                {formatValue(temperature, '°C')}
+              </p>
+              <p className="mt-3 inline-flex items-center gap-1.5 text-sm text-ink-soft">
+                <Clock3 className="h-4 w-4" aria-hidden="true" />
+                As of {formatAsOf(current?.time) ?? '—'}
+              </p>
+            </div>
+            <div className="border-t border-border/80 pt-4 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+              <p className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft">
+                <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                Today&apos;s high / low
+              </p>
+              <p className="mt-2 text-sm text-muted">{today ? formatChartDate(today) : '—'}</p>
+              <p className="mt-1 font-semibold tabular-nums text-ink">
+                <span className="text-heat-orange-ink">High {formatValue(todayHigh, '°C')}</span>
+                <span className="mx-2 text-border-strong" aria-hidden="true">·</span>
+                <span className="text-heat-cool-ink">Low {formatValue(todayLow, '°C')}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(17rem,1fr)]">
+        <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Daily forecast highs</h3>
             <button
               type="button"
               onClick={() => onNavigateToTab('forecast')}
@@ -103,8 +160,8 @@ export function OverviewView({
             <div className="mt-3">
               <DailyHighChart
                 days={days}
-                threshold={terrainThreshold(selectedStation.imdCriteriaType)}
-                today={localDate(current?.time)}
+                terrain={selectedStation.imdCriteriaType}
+                today={today}
               />
             </div>
           ) : weatherState.isLoading ? (
@@ -125,12 +182,9 @@ export function OverviewView({
               </button>
             </div>
           )}
-          <p className="mt-2 text-sm text-muted">
-            Daily extremes use discrete forecast steps (6-hourly later in the week), can understate the true peak, and the first and last local dates can be partial.
-          </p>
         </section>
 
-        <KeyValueList rows={rows} asOf={formatAsOf(current?.time)} />
+        <KeyValueList rows={rows} title="Right now" />
       </div>
 
       {weatherState.error && weatherState.data && (

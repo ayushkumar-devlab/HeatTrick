@@ -4,6 +4,7 @@ import { TerrainThresholds } from '../charts/TerrainThresholds'
 import type { TemperatureBand } from '../charts/types'
 import { forecastPeak } from '../../lib/forecast'
 import { heatwaveVerdict, terrainThreshold } from '../../lib/heatwave'
+import { ViewBanner } from '../ViewBanner'
 
 interface HeatwaveViewProps {
   selectedStation: Station
@@ -50,8 +51,14 @@ export function HeatwaveView({ selectedStation, weatherState }: HeatwaveViewProp
 
   return (
     <div className="space-y-6">
+      <ViewBanner
+        title="Heatwave analysis"
+        description="Basic forecast comparisons against the selected terrain’s IMD temperature thresholds."
+        station={selectedStation}
+        currentTime={weatherState.data?.current.time}
+      />
       <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-7">
-        <h2 className="display-title text-2xl font-semibold text-ink">Forecast threshold comparison</h2>
+        <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Forecast threshold comparison</h3>
         {weatherState.isLoading && !weatherState.data ? (
           <p className="mt-3 text-sm text-muted" role="status">Loading weather data…</p>
         ) : weatherState.error && !weatherState.data ? (

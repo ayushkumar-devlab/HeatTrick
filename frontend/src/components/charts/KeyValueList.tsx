@@ -8,14 +8,15 @@ export interface KeyValueRow {
 interface KeyValueListProps {
   rows: KeyValueRow[]
   asOf?: string | null
+  title?: string
 }
 
-export function KeyValueList({ rows, asOf }: KeyValueListProps) {
+export function KeyValueList({ rows, asOf, title = 'Right now' }: KeyValueListProps) {
   const visibleRows = rows.filter(({ value }) => typeof value === 'number' && Number.isFinite(value))
 
   return (
     <section className="rounded-card border border-border bg-surface p-5 shadow-card" aria-labelledby="right-now-title">
-      <h3 id="right-now-title" className="display-title text-2xl font-semibold text-ink">Right now</h3>
+      <h3 id="right-now-title" className="display-title text-2xl font-semibold text-ink">{title}</h3>
       <dl className="mt-4">
         {visibleRows.map(({ label, value, unit, digits = 1 }, index) => (
           <div key={label} className={`flex items-baseline justify-between gap-3 py-3 ${index ? 'border-t border-border' : ''}`}>

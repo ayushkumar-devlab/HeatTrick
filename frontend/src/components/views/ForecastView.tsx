@@ -2,8 +2,8 @@ import { RefreshCw } from 'lucide-react'
 import type { Station, WeatherState } from '../../types'
 import { RangeChart } from '../charts/RangeChart'
 import type { ChartDay } from '../charts/types'
-import { terrainThreshold } from '../../lib/heatwave'
 import { EmptyState } from '../EmptyState'
+import { ViewBanner } from '../ViewBanner'
 
 interface ForecastViewProps {
   selectedStation: Station
@@ -79,13 +79,18 @@ export function ForecastView({
 
   return (
     <div className="space-y-6">
+      <ViewBanner
+        title="Forecast"
+        description="Daily highs and lows grouped by India local date."
+        station={selectedStation}
+        currentTime={weatherState.data?.current.time}
+      />
       <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="display-title text-2xl font-semibold text-ink">7-day forecast</h2>
-            <p className="display-title mt-3 text-xl font-semibold leading-snug text-ink-soft sm:text-2xl">
+            <h3 className="display-title text-xl font-semibold leading-snug text-ink-soft sm:text-2xl">
               {summary}
-            </p>
+            </h3>
           </div>
           <button
             type="button"
@@ -111,14 +116,13 @@ export function ForecastView({
         <>
           <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6">
             <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Daily high and low</h3>
-            <p className="mt-1 text-sm text-muted">Dashed line: {selectedStation.imdCriteriaType.toLowerCase()} starting threshold at {terrainThreshold(selectedStation.imdCriteriaType)} °C.</p>
             <div className="mt-3">
               <RangeChart
                 days={days}
-                threshold={terrainThreshold(selectedStation.imdCriteriaType)}
+                terrain={selectedStation.imdCriteriaType}
               />
             </div>
-            <p className="mt-2 text-sm leading-6 text-muted">
+            <p className="mt-3 text-sm leading-6 text-muted">
               Daily extremes come from discrete forecast steps (6-hourly later in the week), so they can understate the true peak; the first and last days can be partial.
             </p>
           </section>
