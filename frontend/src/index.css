@@ -2,10 +2,371 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --font-display: "Fraunces";
+  --font-body: "DM Sans";
+  --radius-card: 1.375rem;
+  --radius-panel: 1rem;
+  --shadow-card: 0 2px 5px rgb(65 54 35 / 5%), 0 10px 28px rgb(65 54 35 / 7%);
+  --shadow-lift: 0 4px 10px rgb(65 54 35 / 7%), 0 16px 32px rgb(65 54 35 / 10%);
+
+  --color-canvas: 243 238 228;
+  --color-surface: 255 253 248;
+  --color-surface-alt: 248 243 233;
+  --color-border: 228 220 203;
+  --color-border-strong: 198 185 158;
+  --color-ink: 38 51 47;
+  --color-ink-soft: 61 77 68;
+  --color-muted: 84 101 92;
+  --color-forest: 15 61 58;
+  --color-forest-top: 11 74 79;
+  --color-forest-text: 255 248 235;
+  --color-forest-muted: 205 224 215;
+  --color-brand: 31 122 109;
+  --color-brand-hover: 24 96 85;
+  --color-brand-soft: 224 239 232;
+  --color-brand-ink: 21 79 70;
+  --color-accent: 224 138 30;
+  --color-accent-light: 247 188 103;
+  --color-accent-soft: 250 237 215;
+  --color-accent-ink: 112 65 12;
+  --color-danger-soft: 252 232 228;
+  --color-danger-border: 220 159 150;
+  --color-danger: 147 46 39;
+  --color-success-soft: 226 240 226;
+  --color-success-ink: 43 94 55;
+  --color-warning-soft: 250 237 215;
+  --color-warning-ink: 112 65 12;
+  --color-heat-cool: 42 127 158;
+  --color-heat-cool-soft: 226 240 245;
+  --color-heat-cool-ink: 31 90 111;
+  --color-heat-green: 76 154 95;
+  --color-heat-green-soft: 230 242 231;
+  --color-heat-green-ink: 43 104 58;
+  --color-heat-amber: 224 162 30;
+  --color-heat-amber-soft: 250 239 212;
+  --color-heat-amber-ink: 116 75 9;
+  --color-heat-orange: 229 107 31;
+  --color-heat-orange-soft: 252 234 220;
+  --color-heat-orange-ink: 139 63 15;
+  --color-heat-red: 201 60 43;
+  --color-heat-red-soft: 251 231 226;
+  --color-heat-red-ink: 143 38 29;
+  --color-status-green: 130 211 154;
+  --color-status-amber: 244 189 93;
+  --color-status-red: 255 124 111;
+  --color-scene-sand: 245 216 183;
+  --color-scene-hill: 217 166 110;
+  --color-scene-clay: 201 130 96;
+  --color-scene-sun: 232 180 102;
+  --color-scene-green: 139 155 119;
+  --color-scene-forest: 83 110 91;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: #0f172a;
-  color: #f8fafc;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: rgb(var(--color-canvas));
+  color: rgb(var(--color-ink));
+  font-family: var(--font-body), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  background-image: linear-gradient(180deg, rgb(var(--color-surface-alt) / 0.55), rgb(var(--color-canvas)) 19rem);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--color-brand));
+  outline-offset: 2px;
+}
+
+.site-header :focus-visible,
+.site-footer :focus-visible {
+  outline-color: rgb(var(--color-accent-light));
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.65rem clamp(1rem, 3vw, 2.5rem);
+  color: rgb(var(--color-forest-text));
+  background: linear-gradient(180deg, rgb(var(--color-forest-top)), rgb(var(--color-forest)));
+}
+
+.site-header__brand {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.site-header__tabs {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.site-header__status {
+  grid-column: 3;
+  grid-row: 1;
+  max-width: 17rem;
+}
+
+.site-header__status > div {
+  min-width: 0;
+}
+
+.site-header__brand-title {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(1.75rem, 2.3vw, 2.125rem);
+  line-height: 1;
+}
+
+.site-header__tagline {
+  display: none;
+  margin-top: 0.35rem;
+  color: rgb(var(--color-forest-muted));
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.site-header__status [role="status"] {
+  overflow-wrap: anywhere;
+}
+
+.site-tabs {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.site-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.site-tabs button {
+  flex: 0 0 auto;
+  border-radius: 0.8rem 0.8rem 0.35rem 0.35rem;
+  border-bottom: 3px solid transparent;
+  padding: 0.7rem 0.8rem 0.58rem;
+  font-size: 0.875rem;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.site-tabs button[aria-selected="true"] {
+  border-bottom-color: rgb(var(--color-accent));
+  background: rgb(var(--color-accent) / 0.15);
+  color: rgb(var(--color-forest-text));
+}
+
+.site-tabs button:not([aria-selected="true"]) {
+  color: rgb(var(--color-forest-muted));
+}
+
+.site-tabs button:not([aria-selected="true"]):hover {
+  background: rgb(var(--color-forest-text) / 0.1);
+  color: rgb(var(--color-forest-text));
+}
+
+.site-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: rgb(var(--color-forest));
+  color: rgb(var(--color-forest-text));
+}
+
+.site-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.site-footer a,
+.site-footer button {
+  color: rgb(var(--color-forest-text));
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.display-title {
+  font-family: var(--font-display), Georgia, serif;
+  letter-spacing: -0.015em;
+}
+
+.stat-tile {
+  min-width: min(14rem, 100%);
+  border-radius: 0.875rem;
+  padding: 0.75rem 1rem;
+}
+
+.stat-tile dd,
+.temperature-value {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.forecast-day-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.space-y-6 > section {
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  animation: card-enter 200ms ease-out both;
+}
+
+.space-y-6 > section:nth-child(2) {
+  animation-delay: 35ms;
+}
+
+.space-y-6 > section:nth-child(3) {
+  animation-delay: 70ms;
+}
+
+.space-y-6 > section:nth-child(4) {
+  animation-delay: 105ms;
+}
+
+.space-y-6 > section h2,
+.space-y-6 > section h3 {
+  font-family: var(--font-display), Georgia, serif;
+}
+
+.temperature-alert-bands > *:nth-child(1) {
+  background-color: rgb(var(--color-success-soft));
+  color: rgb(var(--color-success-ink));
+}
+
+.temperature-alert-bands > *:nth-child(2) {
+  background-color: rgb(var(--color-warning-soft));
+  color: rgb(var(--color-warning-ink));
+}
+
+.temperature-alert-bands > *:nth-child(3) {
+  background-color: rgb(var(--color-heat-orange-soft));
+  color: rgb(var(--color-heat-orange-ink));
+}
+
+.temperature-alert-bands > *:nth-child(4) {
+  background-color: rgb(var(--color-danger-soft));
+  color: rgb(var(--color-danger));
+}
+
+.card-enter {
+  animation: card-enter 200ms ease-out both;
+}
+
+.day-card {
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.day-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+}
+
+@media (min-width: 1024px) {
+  .site-header__tagline {
+    display: block;
+  }
+}
+
+@media (max-width: 1023px) {
+  .site-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.35rem 0.8rem;
+  }
+
+  .site-header__brand {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .site-header__status {
+    grid-column: 2;
+    grid-row: 1;
+    max-width: 15rem;
+  }
+
+  .site-header__tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+  }
+
+  .site-tabs {
+    justify-content: flex-start;
+  }
+
+}
+
+@media (max-width: 767px) {
+  .forecast-day-grid {
+    grid-auto-columns: minmax(14rem, 78%);
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding: 0.25rem 0.1rem 0.75rem;
+  }
+
+  .forecast-day-grid > * {
+    scroll-snap-align: start;
+  }
+
+  .site-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .site-footer__links {
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .site-header {
+    padding-inline: 0.75rem;
+    column-gap: 0.35rem;
+  }
+
+  .site-header__status {
+    max-width: 44vw;
+    align-self: start;
+    padding-top: 0.3rem;
+    font-size: 0.68rem;
+  }
+
+  .site-header__status > div {
+    overflow-wrap: anywhere;
+  }
 }

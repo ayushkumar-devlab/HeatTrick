@@ -9,6 +9,7 @@ import time
 from datetime import date, datetime, timezone
 from decimal import Decimal, ROUND_DOWN
 from email.utils import parsedate_to_datetime
+from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query
@@ -52,6 +53,7 @@ LOCATIONFORECAST_URL = (
 METNO_USER_AGENT = (
     "HeatTrick/0.2.1 (+https://github.com/ayushkumar-devlab/HeatTrick)"
 )
+FORECAST_TIME_ZONE = ZoneInfo("Asia/Kolkata")
 
 
 def _upstream_error_excerpt(response: httpx.Response) -> str:
@@ -354,7 +356,7 @@ async def get_weather(
     current_time, _, current_details = parsed_steps[0]
     daily_values: dict[date, dict[str, list[float]]] = {}
     for _, forecast_time, details in parsed_steps:
-        day = forecast_time.date()
+        day = forecast_time.astimezone(FORECAST_TIME_ZONE).date()
         values = daily_values.setdefault(
             day, {"temperature": [], "wind_speed": []}
         )
@@ -445,7 +447,7 @@ async def get_weather(
             latitude=result_latitude,
             longitude=result_longitude,
             elevation=elevation,
-            timezone="UTC",
+            timezone="Asia/Kolkata",
             retrieved_at=datetime.now(timezone.utc).isoformat(),
         ),
     )

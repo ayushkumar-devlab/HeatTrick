@@ -1,3 +1,5 @@
+import { useRef } from 'react'
+import type { KeyboardEvent } from 'react'
 import type { ActiveTab } from '../types'
 import {
   LayoutDashboard,
@@ -13,37 +15,52 @@ interface NavigationTabsProps {
 }
 
 export function NavigationTabs({ activeTab, onTabChange }: NavigationTabsProps) {
-  const tabs: { id: ActiveTab; label: string; icon: React.ElementType; badge?: string }[] = [
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const tabs: { id: ActiveTab; label: string; icon: React.ElementType }[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'heatwave', label: 'Heatwave Analysis', icon: Flame },
     { id: 'thermal-stress', label: 'Thermal Stress', icon: Activity },
-    { id: 'forecast', label: 'Forecast & Trends', icon: LineChart },
-    { id: 'methodology', label: 'Methodology & Sources', icon: BookOpen },
+    { id: 'forecast', label: 'Forecast', icon: LineChart },
+    { id: 'methodology', label: 'Methods & sources', icon: BookOpen },
   ]
 
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex = index
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length
+    else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length
+    else if (event.key === 'Home') nextIndex = 0
+    else if (event.key === 'End') nextIndex = tabs.length - 1
+    else return
+    event.preventDefault()
+    const nextTab = tabs[nextIndex]
+    if (nextTab) {
+      onTabChange(nextTab.id)
+      tabRefs.current[nextIndex]?.focus()
+    }
+  }
+
   return (
-    <nav className="border-b border-slate-800 bg-slate-900/40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex overflow-x-auto no-scrollbar gap-1">
-        {tabs.map((tab) => {
+    <nav aria-label="Weather dashboard sections" className="site-header__tabs">
+      <div role="tablist" aria-orientation="horizontal" className="site-tabs">
+        {tabs.map((tab, index) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
           return (
             <button
               key={tab.id}
+              ref={(element) => { tabRefs.current[index] = element }}
+              id={`tab-${tab.id}`}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              aria-controls="dashboard-panel"
+              tabIndex={isActive ? 0 : -1}
               onClick={() => onTabChange(tab.id)}
-              className={`flex items-center gap-2 py-3 px-3.5 text-xs font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                isActive
-                  ? 'border-teal-400 text-teal-300 bg-slate-800/40 font-semibold'
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-              }`}
+              onKeyDown={(event) => handleKeyDown(event, index)}
+              className="flex items-center gap-2 font-medium whitespace-nowrap cursor-pointer"
             >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-teal-400' : 'text-slate-500'}`} />
+              <Icon className={`w-4 h-4 ${isActive ? 'text-accent' : 'text-forest-muted'}`} aria-hidden="true" />
               <span>{tab.label}</span>
-              {tab.badge && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-normal">
-                  {tab.badge}
-                </span>
-              )}
             </button>
           )
         })}

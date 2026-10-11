@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
-import type { ActiveTab, Station, BackendHealth, WeatherState } from './types'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import type { ActiveTab, Station, WeatherState } from './types'
 import { REFERENCE_STATIONS } from './data/stations'
 import { fetchWeatherData } from './services/weather'
 import { Navbar } from './components/Navbar'
-import { NavigationTabs } from './components/NavigationTabs'
 import { StationSelector } from './components/StationSelector'
 import { OverviewView } from './components/views/OverviewView'
 import { HeatwaveView } from './components/views/HeatwaveView'
@@ -15,154 +14,193 @@ import { Footer } from './components/Footer'
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
   const [selectedStation, setSelectedStation] = useState<Station>(REFERENCE_STATIONS[0])
-  const [backendHealth, setBackendHealth] = useState<BackendHealth>({
-    status: 'checking',
-  })
   const [weatherState, setWeatherState] = useState<WeatherState>({
     data: null,
     isLoading: true,
     error: null,
     lastFetched: null,
+    stationId: REFERENCE_STATIONS[0].id,
   })
+  const requestId = useRef(0)
+  const activeController = useRef<AbortController | null>(null)
 
-  // Backend Health Ping Check
-  const checkHealth = useCallback(async (signal?: AbortSignal) => {
-    setBackendHealth((prev) => ({ ...prev, status: 'checking' }))
-    const startTime = performance.now()
+  const requestWeather = useCallback(async (
+    station: Station,
+    controller: AbortController,
+    currentRequestId: number,
+  ) => {
     try {
-      const response = await fetch('/api/health', {
-        headers: { Accept: 'application/json' },
-        signal,
-      })
-      const endTime = performance.now()
-      const latencyMs = Math.round(endTime - startTime)
-      const lastChecked = new Date().toLocaleTimeString()
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} (${response.statusText})`)
-      }
-
-      const payload = await response.json()
-
-      if (payload.status === 'ok' && payload.app === 'HeatTrick') {
-        setBackendHealth({
-          status: 'ok',
-          app: payload.app,
-          latencyMs,
-          lastChecked,
-        })
-      } else {
-        throw new Error(`Unexpected payload: ${JSON.stringify(payload)}`)
-      }
-    } catch (err: unknown) {
-      if (signal?.aborted) {
+      const data = await fetchWeatherData(
+        station.latitude,
+        station.longitude,
+        controller.signal,
+      )
+      if (controller.signal.aborted || currentRequestId !== requestId.current) {
         return
       }
-      const errorMessage = err instanceof Error ? err.message : 'Connection failed'
-      setBackendHealth({
-        status: 'error',
-        errorMessage,
-        lastChecked: new Date().toLocaleTimeString(),
-      })
-    }
-  }, [])
-
-  // Weather Data Fetching for currently selected station
-  const loadWeather = useCallback(async (lat: number, lon: number, signal?: AbortSignal) => {
-    setWeatherState((prev) => ({ ...prev, isLoading: true, error: null }))
-    try {
-      const data = await fetchWeatherData(lat, lon, signal)
       setWeatherState({
         data,
         isLoading: false,
         error: null,
-        lastFetched: new Date().toLocaleTimeString(),
+        lastFetched: new Date().toISOString(),
+        stationId: station.id,
       })
-    } catch (err: unknown) {
-      if (signal?.aborted) {
+    } catch (error: unknown) {
+      if (controller.signal.aborted || currentRequestId !== requestId.current) {
         return
       }
-      const errorMessage = err instanceof Error ? err.message : 'Failed to retrieve weather data'
-      setWeatherState((prev) => ({
-        ...prev,
+      setWeatherState((previous) => ({
+        ...previous,
         isLoading: false,
-        error: errorMessage,
-        lastFetched: new Date().toLocaleTimeString(),
+        error: error instanceof Error
+          ? error.message
+          : 'Unable to retrieve weather data.',
       }))
+    } finally {
+      if (activeController.current === controller) {
+        activeController.current = null
+      }
     }
   }, [])
 
-  // Initial health check on mount with AbortController
-  useEffect(() => {
-    const controller = new AbortController()
-    void checkHealth(controller.signal)
-    return () => {
-      controller.abort()
-    }
-  }, [checkHealth])
+  const loadWeather = useCallback(async (
+    station: Station,
+    controller: AbortController,
+  ) => {
+    activeController.current?.abort()
+    activeController.current = controller
+    const currentRequestId = ++requestId.current
 
-  // Fetch weather data when station coordinates change
+    setWeatherState((previous) => {
+      const sameStation = previous.stationId === station.id
+      return {
+        data: sameStation ? previous.data : null,
+        isLoading: true,
+        error: null,
+        lastFetched: sameStation ? previous.lastFetched : null,
+        stationId: station.id,
+      }
+    })
+
+    await requestWeather(station, controller, currentRequestId)
+  }, [requestWeather])
+
   useEffect(() => {
     const controller = new AbortController()
-    void loadWeather(selectedStation.latitude, selectedStation.longitude, controller.signal)
+    activeController.current = controller
+    const currentRequestId = ++requestId.current
+    void fetchWeatherData(
+      REFERENCE_STATIONS[0].latitude,
+      REFERENCE_STATIONS[0].longitude,
+      controller.signal,
+    ).then((data) => {
+      if (controller.signal.aborted || currentRequestId !== requestId.current) {
+        return
+      }
+      setWeatherState({
+        data,
+        isLoading: false,
+        error: null,
+        lastFetched: new Date().toISOString(),
+        stationId: REFERENCE_STATIONS[0].id,
+      })
+    }).catch((error: unknown) => {
+      if (controller.signal.aborted || currentRequestId !== requestId.current) {
+        return
+      }
+      setWeatherState((previous) => ({
+        ...previous,
+        isLoading: false,
+        error: error instanceof Error
+          ? error.message
+          : 'Unable to retrieve weather data.',
+      }))
+    }).finally(() => {
+      if (activeController.current === controller) {
+        activeController.current = null
+      }
+    })
     return () => {
       controller.abort()
+      if (activeController.current === controller) {
+        requestId.current += 1
+        activeController.current = null
+      }
     }
-  }, [loadWeather, selectedStation.latitude, selectedStation.longitude])
+  }, [requestWeather])
 
   const handleRefreshWeather = useCallback(() => {
-    void loadWeather(selectedStation.latitude, selectedStation.longitude)
-  }, [loadWeather, selectedStation.latitude, selectedStation.longitude])
+    if (weatherState.isLoading) return
+    void loadWeather(selectedStation, new AbortController())
+  }, [loadWeather, selectedStation, weatherState.isLoading])
+
+  const handleSelectStation = useCallback((station: Station) => {
+    setSelectedStation(station)
+    void loadWeather(station, new AbortController())
+  }, [loadWeather])
+
+  const visibleWeatherState = weatherState.stationId === selectedStation.id
+    ? weatherState
+    : {
+        data: null,
+        isLoading: true,
+        error: null,
+        lastFetched: null,
+        stationId: selectedStation.id,
+      }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-teal-500/30 selection:text-teal-200">
-      {/* Top Navbar */}
-      <Navbar health={backendHealth} onRefreshHealth={() => void checkHealth()} />
+    <div className="min-h-screen bg-canvas text-ink flex flex-col font-body selection:bg-brand-soft selection:text-ink">
+      <Navbar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        weatherState={visibleWeatherState}
+        onRetry={handleRefreshWeather}
+      />
 
-      {/* Main Navigation Tabs */}
-      <NavigationTabs activeTab={activeTab} onTabChange={setActiveTab} />
-
-      {/* Primary Dashboard Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* Station Selector Bar (Visible across observation & forecast views) */}
+      <main
+        id="dashboard-panel"
+        role="tabpanel"
+        aria-labelledby={`tab-${activeTab}`}
+        tabIndex={0}
+        className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6"
+      >
         {activeTab !== 'methodology' && (
           <StationSelector
             selectedStation={selectedStation}
-            onSelectStation={setSelectedStation}
+            onSelectStation={handleSelectStation}
           />
         )}
 
-        {/* Dynamic View Rendering */}
         {activeTab === 'overview' && (
           <OverviewView
             selectedStation={selectedStation}
-            backendHealth={backendHealth}
-            weatherState={weatherState}
+            weatherState={visibleWeatherState}
             onRefreshWeather={handleRefreshWeather}
             onNavigateToTab={setActiveTab}
           />
         )}
-
         {activeTab === 'heatwave' && (
-          <HeatwaveView selectedStation={selectedStation} />
+          <HeatwaveView
+            selectedStation={selectedStation}
+            weatherState={visibleWeatherState}
+          />
         )}
-
         {activeTab === 'thermal-stress' && (
-          <ThermalStressView selectedStation={selectedStation} />
+          <ThermalStressView
+            weatherState={visibleWeatherState}
+          />
         )}
-
         {activeTab === 'forecast' && (
           <ForecastView
             selectedStation={selectedStation}
-            weatherState={weatherState}
+            weatherState={visibleWeatherState}
             onRefreshWeather={handleRefreshWeather}
           />
         )}
-
         {activeTab === 'methodology' && <MethodologyView />}
       </main>
 
-      {/* Academic Prototype Footer */}
       <Footer />
     </div>
   )

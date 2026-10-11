@@ -1,149 +1,110 @@
-import { Activity, ShieldCheck, HeartPulse, Gauge } from 'lucide-react'
-import type { Station } from '../../types'
-import { EmptyState } from '../EmptyState'
+import type { WeatherState } from '../../types'
+import { BandBar } from '../charts/BandBar'
+import type { TemperatureBand } from '../charts/types'
+import { dewPointFromTRh } from '../../lib/dewPoint'
+import { calculateHeatIndexCelsius } from '../../utils/heatIndex'
 
 interface ThermalStressViewProps {
-  selectedStation: Station
+  weatherState: WeatherState
 }
 
-export function ThermalStressView({ selectedStation }: ThermalStressViewProps) {
-  const wbgtBands = [
-    { range: '< 27.7 °C', category: 'Low Risk', workRest: 'Normal activity', color: 'text-emerald-400', border: 'border-emerald-500/30' },
-    { range: '27.7 – 29.4 °C', category: 'Moderate Risk', workRest: '75% work / 25% rest per hour', color: 'text-amber-400', border: 'border-amber-500/30' },
-    { range: '29.4 – 31.1 °C', category: 'High Risk', workRest: '50% work / 50% rest per hour', color: 'text-orange-400', border: 'border-orange-500/30' },
-    { range: '31.1 – 32.2 °C', category: 'Very High Risk', workRest: '25% work / 75% rest per hour', color: 'text-rose-400', border: 'border-rose-500/30' },
-    { range: '> 32.2 °C', category: 'Extreme Danger', workRest: 'Suspend non-essential outdoor work', color: 'text-red-500', border: 'border-red-500/30' },
-  ]
+const NOAA_BANDS: TemperatureBand[] = [
+  { from: 0, to: 26.7, label: 'Below caution', color: 'rgb(var(--color-heat-cool))' },
+  { from: 26.7, to: 32.2, label: 'Caution', color: 'rgb(var(--color-heat-green))' },
+  { from: 32.2, to: 39.4, label: 'Extreme caution', color: 'rgb(var(--color-heat-amber))' },
+  { from: 39.4, to: 51.7, label: 'Danger', color: 'rgb(var(--color-heat-orange))' },
+  { from: 51.7, to: 60, label: 'Extreme danger', color: 'rgb(var(--color-heat-red))' },
+]
 
-  const heatIndexBands = [
-    { range: '< 27 °C', category: 'Normal', note: 'No significant thermal discomfort' },
-    { range: '27 – 32 °C', category: 'Caution', note: 'Fatigue possible with prolonged exposure' },
-    { range: '32 – 41 °C', category: 'Extreme Caution', note: 'Heat cramps and heat exhaustion possible' },
-    { range: '41 – 54 °C', category: 'Danger', note: 'Heat exhaustion likely, heatstroke possible' },
-    { range: '> 54 °C', category: 'Extreme Danger', note: 'Heatstroke highly imminent' },
-  ]
+function heatIndexBand(value: number) {
+  if (value < 26.7) return 'below the NOAA caution band'
+  if (value < 32.2) return 'NOAA caution'
+  if (value < 39.4) return 'NOAA extreme caution'
+  if (value < 51.7) return 'NOAA danger'
+  return 'NOAA extreme danger'
+}
+
+function formatValue(value: number | null | undefined, unit: string) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? `${value.toFixed(1)} ${unit}`
+    : '—'
+}
+
+export function ThermalStressView({ weatherState }: ThermalStressViewProps) {
+  const current = weatherState.data?.current
+  const temperature = current?.temperature_2m
+  const humidity = current?.relative_humidity_2m
+  const heatIndex = calculateHeatIndexCelsius(temperature, humidity)
+  const dewPoint = dewPointFromTRh(temperature, humidity)
 
   return (
     <div className="space-y-6">
-      {/* Title & Scope */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/20">
-            <HeartPulse className="w-5 h-5" />
-          </div>
-          <div>
-            <h2 className="text-base font-bold text-white">
-              Human Thermal Stress & Biometeorological Assessment
-            </h2>
-            <p className="text-xs text-slate-400">
-              Assessing occupational heat strain, evaporative cooling failure, and physiological vulnerability
-            </p>
-          </div>
-        </div>
-
-        <div className="p-3 mt-3 rounded-lg bg-teal-950/20 border border-teal-500/30 text-teal-200/90 text-xs flex items-start gap-2.5">
-          <ShieldCheck className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
-          <div>
-            <strong className="text-teal-300">Biometeorological Distinction: </strong>
-            Unlike meteorological heatwaves (which measure atmospheric temperature), human thermal stress models the physiological energy balance between the human body and its environment. High atmospheric humidity impairs sweat evaporation, causing dangerous core body heating even at moderate temperatures (35°C–38°C).
-          </div>
-        </div>
-      </div>
-
-      {/* WBGT & Heat Index Reference Standards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* WBGT Panel */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Gauge className="w-4 h-4 text-teal-400" />
-              <span>Wet-Bulb Globe Temperature (WBGT)</span>
-            </h3>
-            <span className="text-[11px] font-mono text-slate-400">ISO 7243 Standard</span>
-          </div>
-
-          <p className="text-xs text-slate-400 mb-3 leading-relaxed">
-            Standard ISO 7243 WBGT relies on natural wet-bulb, black globe, and dry-bulb thermometers. HeatTrick computes an <strong>empirical outdoor WBGT estimate</strong> from ambient variables, documenting known error bounds under low-wind conditions.
+      <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-7">
+        <h2 className="display-title text-2xl font-semibold text-ink">Heat index</h2>
+        {weatherState.isLoading && !weatherState.data ? (
+          <p className="mt-3 text-sm text-muted" role="status">Loading weather data…</p>
+        ) : weatherState.error && !weatherState.data ? (
+          <p className="mt-3 rounded-lg border border-danger-border bg-danger-soft p-3 text-sm text-danger" role="status">
+            Weather data could not be loaded. Retry from the header.
           </p>
-
-          <div className="space-y-2">
-            {wbgtBands.map((band) => (
-              <div
-                key={band.range}
-                className={`flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border ${band.border} text-xs`}
-              >
-                <div>
-                  <span className={`font-mono font-bold ${band.color}`}>{band.range}</span>
-                  <span className="text-slate-400 ml-2 font-medium">({band.category})</span>
-                </div>
-                <span className="text-[11px] text-slate-400 font-sans">{band.workRest}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* NOAA Heat Index Panel */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Activity className="w-4 h-4 text-amber-400" />
-              <span>NOAA Heat Index (Apparent Temperature)</span>
-            </h3>
-            <span className="text-[11px] font-mono text-slate-400">Rothfusz Regression</span>
-          </div>
-
-          <p className="text-xs text-slate-400 mb-3 leading-relaxed">
-            The Heat Index measures perceived temperature combining dry-bulb air temperature and relative humidity, reflecting reduced bodily heat dissipation through evaporative sweating.
+        ) : heatIndex == null ? (
+          <p className="mt-4 rounded-lg border border-border bg-surface-alt p-4 text-sm leading-6 text-ink-soft">
+            Heat Index is not available because valid air temperature and relative humidity inputs are required.
           </p>
-
-          <div className="space-y-2">
-            {heatIndexBands.map((band) => (
-              <div
-                key={band.range}
-                className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800 text-xs"
-              >
-                <div>
-                  <span className="font-mono font-bold text-slate-200">{band.range}</span>
-                  <span className="text-amber-400 ml-2 font-medium">({band.category})</span>
-                </div>
-                <span className="text-[11px] text-slate-400 font-sans">{band.note}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Selected Station Assessment State */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
-          <div>
-            <h3 className="text-sm font-semibold text-white">
-              Thermal Strain Diagnostics for {selectedStation.name}
-            </h3>
-            <p className="text-xs text-slate-400">
-              Microclimate zone: {selectedStation.zone}
+        ) : (
+          <>
+            <p className="display-title mt-4 text-2xl font-semibold text-ink sm:text-3xl">
+              Heat Index is {heatIndex.toFixed(1)} °C: {heatIndexBand(heatIndex)}
             </p>
-          </div>
-          <span className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 font-mono">
-            Engine: Ready for Ingestion Feed
-          </span>
-        </div>
+            <div className="mt-3">
+              <BandBar
+                bands={NOAA_BANDS}
+                value={heatIndex}
+                unit="°C"
+                ariaLabel="Calculated heat index on NOAA heat index bands"
+              />
+            </div>
+            <p className="mt-2 text-sm leading-6 text-ink-soft">
+              This is an estimate from forecast air temperature and humidity, not an observed value.
+            </p>
+          </>
+        )}
+        {weatherState.error && weatherState.data && (
+          <p className="mt-4 rounded-lg border border-warning-soft bg-warning-soft p-3 text-sm text-warning-ink" role="status">
+            The latest refresh failed; earlier forecast data is still displayed.
+          </p>
+        )}
+      </section>
 
-        <EmptyState
-          icon={Activity}
-          title="Concurrent Temperature & Moisture Feed Required"
-          description={`To compute WBGT and Heat Index for ${selectedStation.name}, simultaneous air temperature, surface humidity, solar radiation, and wind velocity must be ingested. This calculation engine will be implemented in Module 3.`}
-          moduleNotice="Module 3: Biometeorological Stress Indices Engine"
-          expectedParams={[
-            'Ambient Air Temp (T_air, °C)',
-            'Relative Humidity (RH, %)',
-            'Dew Point Temperature (Td, °C)',
-            'Estimated Natural Wet-Bulb (Tw, °C)',
-            'Outdoor WBGT Estimate (°C)',
-            'NOAA Heat Index (°C)',
-          ]}
-        />
-      </div>
+      <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6">
+        <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Current inputs</h3>
+        <dl className="mt-3 divide-y divide-border">
+          <div className="flex items-baseline justify-between gap-3 py-3">
+            <dt className="text-sm text-ink-soft">Air temperature</dt>
+            <dd className="shrink-0 font-semibold tabular-nums text-ink">{formatValue(temperature, '°C')}</dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-3 py-3">
+            <dt className="text-sm text-ink-soft">Relative humidity</dt>
+            <dd className="shrink-0 font-semibold tabular-nums text-ink">{formatValue(humidity, '%')}</dd>
+          </div>
+          {dewPoint != null && (
+            <div className="flex items-baseline justify-between gap-3 py-3">
+              <dt className="text-sm text-ink-soft">Dew point (derived from temperature and humidity)</dt>
+              <dd className="shrink-0 font-semibold tabular-nums text-ink">{formatValue(dewPoint, '°C')}</dd>
+            </div>
+          )}
+          <div className="flex items-baseline justify-between gap-3 py-3">
+            <dt className="text-sm text-ink-soft">Wind at 10 m</dt>
+            <dd className="shrink-0 font-semibold tabular-nums text-ink">{formatValue(current?.wind_speed_10m, 'm/s')}</dd>
+          </div>
+        </dl>
+        <p className="mt-3 rounded-lg bg-warning-soft p-3 text-sm leading-6 text-warning-ink">
+          The National Weather Service uses a simplified formula below 80°F and the Rothfusz regression with adjustments at higher temperatures. It does not account for sun exposure, clothing, activity, or individual health.
+        </p>
+        <p className="mt-3 text-sm leading-6 text-ink-soft">
+          Planned: WBGT needs solar radiation, which this weather source does not provide.
+        </p>
+      </section>
     </div>
   )
 }

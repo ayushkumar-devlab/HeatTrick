@@ -16,14 +16,6 @@ export interface Station {
   imdCriteriaType: 'Plains' | 'Coastal' | 'Hilly'
 }
 
-export interface BackendHealth {
-  status: 'ok' | 'error' | 'checking'
-  app?: string
-  latencyMs?: number
-  lastChecked?: string
-  errorMessage?: string
-}
-
 export interface CurrentWeather {
   time: string
   temperature_2m: number | null
@@ -68,4 +60,5 @@ export interface WeatherState {
   isLoading: boolean
   error: string | null
   lastFetched: string | null
+  stationId: string
 }

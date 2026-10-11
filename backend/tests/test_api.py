@@ -38,6 +38,7 @@ def _met_norway_payload():
         ("2026-10-11T00:00:00Z", 21.0, 2.0),
         ("2026-10-11T06:00:00Z", 28.5, 4.5),
         ("2026-10-11T18:00:00Z", 22.0, 3.0),
+        ("2026-10-11T20:00:00Z", 30.5, 5.5),
         ("2026-10-12T00:00:00Z", 19.5, 1.5),
     ]
     timeseries = []
@@ -153,11 +154,11 @@ def test_weather_maps_met_norway_forecast(monkeypatch):
         "precipitation": None,
     }
     assert data["daily"]["time"] == ["2026-10-11", "2026-10-12"]
-    assert data["daily"]["temperature_2m_max"] == [28.5, 19.5]
+    assert data["daily"]["temperature_2m_max"] == [28.5, 30.5]
     assert data["daily"]["temperature_2m_min"] == [21.0, 19.5]
     assert data["daily"]["apparent_temperature_max"] == [None, None]
     assert data["daily"]["apparent_temperature_min"] == [None, None]
-    assert data["daily"]["wind_speed_10m_max"] == [4.5, 1.5]
+    assert data["daily"]["wind_speed_10m_max"] == [4.5, 5.5]
     assert data["daily"]["precipitation_sum"] == [None, None]
     assert data["units"]["dew_point_2m"] == "°C"
     assert data["units"]["wind_speed_10m"] == "m/s"
@@ -168,7 +169,7 @@ def test_weather_maps_met_norway_forecast(monkeypatch):
     assert data["metadata"]["latitude"] == 28.5833
     assert data["metadata"]["longitude"] == 77.2083
     assert data["metadata"]["elevation"] == 216.0
-    assert data["metadata"]["timezone"] == "UTC"
+    assert data["metadata"]["timezone"] == "Asia/Kolkata"
 
     assert len(calls) == 1
     url, params, headers = calls[0]

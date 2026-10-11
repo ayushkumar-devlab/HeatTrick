@@ -1,5 +1,8 @@
-import { LineChart, Calendar, BellRing, RefreshCw, AlertTriangle, Wind, Droplets, ThermometerSun } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import type { Station, WeatherState } from '../../types'
+import { RangeChart } from '../charts/RangeChart'
+import type { ChartDay } from '../charts/types'
+import { terrainThreshold } from '../../lib/heatwave'
 import { EmptyState } from '../EmptyState'
 
 interface ForecastViewProps {
@@ -8,261 +11,154 @@ interface ForecastViewProps {
   onRefreshWeather: () => void
 }
 
+function formatValue(value: number | null | undefined) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? `${value.toFixed(1)} °C`
+    : '—'
+}
+
+function temperatureTone(value: number | null | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 'text-muted'
+  if (value < 25) return 'text-heat-cool-ink'
+  if (value < 30) return 'text-heat-green-ink'
+  if (value < 35) return 'text-heat-amber-ink'
+  if (value < 40) return 'text-heat-orange-ink'
+  return 'text-heat-red-ink'
+}
+
+function temperatureCardTone(value: number | null | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 'border-t-border-strong bg-surface-alt'
+  }
+  if (value < 25) return 'border-t-heat-cool bg-heat-cool-soft'
+  if (value < 30) return 'border-t-heat-green bg-heat-green-soft'
+  if (value < 35) return 'border-t-heat-amber bg-heat-amber-soft'
+  if (value < 40) return 'border-t-heat-orange bg-heat-orange-soft'
+  return 'border-t-heat-red bg-heat-red-soft'
+}
+
+function formatLocalDate(day: string) {
+  const [year, month, date] = day.split('-').map(Number)
+  const utcDate = new Date(Date.UTC(year, month - 1, date, 12))
+  return {
+    weekday: utcDate.toLocaleDateString('en-IN', { timeZone: 'UTC', weekday: 'long' }),
+    fullDate: utcDate.toLocaleDateString('en-IN', {
+      timeZone: 'UTC',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }),
+  }
+}
+
 export function ForecastView({
   selectedStation,
   weatherState,
   onRefreshWeather,
 }: ForecastViewProps) {
   const daily = weatherState.data?.daily
-  const metadata = weatherState.data?.metadata
-
-  const alertLevels = [
-    {
-      level: 'Green (Normal)',
-      desc: 'Comfortable / Normal temperature conditions expected across the forecast window.',
-      action: 'Standard operational awareness.',
-      border: 'border-emerald-500/30',
-      badge: 'bg-emerald-500/10 text-emerald-400',
-    },
-    {
-      level: 'Yellow (Watch / Be Updated)',
-      desc: 'Moderate heatwave conditions likely to persist for 1–2 days. Elevated thermal discomfort for vulnerable groups.',
-      action: 'Advisory to outdoor workers; hydration campaigns active.',
-      border: 'border-yellow-500/30',
-      badge: 'bg-yellow-500/10 text-yellow-400',
-    },
-    {
-      level: 'Orange (Alert / Be Prepared)',
-      desc: 'Severe heatwave conditions likely for 2 days or prolonged heatwave for 4+ days. Significant health hazard.',
-      action: 'Schedule adjustments for outdoor shifts, cooling centers activated.',
-      border: 'border-orange-500/30',
-      badge: 'bg-orange-500/10 text-orange-400',
-    },
-    {
-      level: 'Red (Warning / Take Action)',
-      desc: 'Severe heatwave persisting >2 days or total max temp ≥ 47.0°C. Very high risk of heat illness across all age groups.',
-      action: 'Emergency public health response; suspension of strenuous outdoor labor during peak hours (12 PM–4 PM).',
-      border: 'border-rose-500/30',
-      badge: 'bg-rose-500/10 text-rose-400',
-    },
-  ]
+  const days: ChartDay[] = (daily?.time ?? []).slice(0, 7).map((date, index) => ({
+    date,
+    high: daily?.temperature_2m_max[index],
+    low: daily?.temperature_2m_min[index],
+  }))
+  const availableHighs = days.flatMap(({ date, high }) =>
+    typeof high === 'number' && Number.isFinite(high) ? [{ date, high }] : [],
+  )
+  const coolest = availableHighs.reduce<typeof availableHighs[number] | null>(
+    (minimum, day) => minimum == null || day.high < minimum.high ? day : minimum,
+    null,
+  )
+  const warmest = availableHighs.reduce<typeof availableHighs[number] | null>(
+    (maximum, day) => maximum == null || day.high > maximum.high ? day : maximum,
+    null,
+  )
+  const summary = coolest && warmest
+    ? `Highs range from ${coolest.high.toFixed(1)} °C on ${formatLocalDate(coolest.date).weekday} to ${warmest.high.toFixed(1)} °C on ${formatLocalDate(warmest.date).weekday} in this forecast.`
+    : 'Forecast highs are unavailable.'
 
   return (
     <div className="space-y-6">
-      {/* Title & Scope */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
-              <LineChart className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-white">
-                7-Day Numerical Weather Forecast & Trend Projections
-              </h2>
-              <p className="text-xs text-slate-400">
-                Multi-day meteorological parameters for {selectedStation.name} ({selectedStation.state})
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {weatherState.isLoading ? (
-              <span className="flex items-center gap-1.5 text-xs text-sky-400 font-mono">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Loading forecast...</span>
-              </span>
-            ) : (
-              <button
-                onClick={onRefreshWeather}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
-              >
-                <RefreshCw className="w-3 h-3" />
-                <span>Refresh Forecast</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-          Numerical weather predictions provide 1–7 day forward visibility. In this foundation stage, raw meteorological forecast parameters are retrieved directly from Open-Meteo NWP models. Analytical risk-band scoring will be computed in Module 5.
-        </p>
-      </div>
-
-      {/* Error Notice */}
-      {weatherState.error && !weatherState.isLoading && (
-        <div className="p-3.5 rounded-xl bg-rose-950/30 border border-rose-500/40 text-xs text-rose-200 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-            <span>Failed to load forecast data: {weatherState.error}</span>
+      <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-7">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="display-title text-2xl font-semibold text-ink">7-day forecast</h2>
+            <p className="display-title mt-3 text-xl font-semibold leading-snug text-ink-soft sm:text-2xl">
+              {summary}
+            </p>
           </div>
           <button
+            type="button"
             onClick={onRefreshWeather}
-            className="px-2.5 py-1 rounded bg-rose-900/40 hover:bg-rose-900/60 border border-rose-700/60 text-rose-200 text-xs font-medium cursor-pointer"
+            disabled={weatherState.isLoading}
+            className="inline-flex items-center gap-2 rounded-lg border border-brand bg-brand px-3 py-2 text-sm font-medium text-forest-text hover:bg-brand-hover disabled:cursor-wait disabled:opacity-60"
           >
-            Retry
+            <RefreshCw className={`h-4 w-4 ${weatherState.isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
+            {weatherState.isLoading ? 'Updating' : 'Refresh'}
           </button>
         </div>
+      </section>
+
+      {weatherState.error && (
+        <p className="rounded-xl border border-danger-border bg-danger-soft p-4 text-sm text-danger" role="status">
+          {weatherState.data
+            ? 'The latest refresh failed. The previously loaded forecast is still shown.'
+            : 'Weather data could not be loaded. Retry to try again.'}
+        </p>
       )}
 
-      {/* Real 7-Day Forecast Cards */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-sky-400" />
-            <h3 className="text-sm font-semibold text-white">
-              7-Day Daily Forecast Horizon for {selectedStation.name}
-            </h3>
-          </div>
-          {metadata && (
-            <span className="text-[11px] text-slate-400 font-mono">
-              Provider: {metadata.source} ({metadata.model})
-            </span>
-          )}
-        </div>
+      {daily && daily.time.length > 0 ? (
+        <>
+          <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6">
+            <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Daily high and low</h3>
+            <p className="mt-1 text-sm text-muted">Dashed line: {selectedStation.imdCriteriaType.toLowerCase()} starting threshold at {terrainThreshold(selectedStation.imdCriteriaType)} °C.</p>
+            <div className="mt-3">
+              <RangeChart
+                days={days}
+                threshold={terrainThreshold(selectedStation.imdCriteriaType)}
+              />
+            </div>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              Daily extremes come from discrete forecast steps (6-hourly later in the week), so they can understate the true peak; the first and last days can be partial.
+            </p>
+          </section>
 
-        {daily && daily.time.length > 0 ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
-              {daily.time.slice(0, 7).map((dayTime, idx) => {
-                const dateObj = new Date(dayTime)
-                const isToday = idx === 0
-                const dayName = isToday ? 'Today' : dateObj.toLocaleDateString('en-IN', { weekday: 'short' })
-                const fullDate = dateObj.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
-                const tmax = daily.temperature_2m_max[idx]
-                const tmin = daily.temperature_2m_min[idx]
-                const apparentMax = daily.apparent_temperature_max[idx]
-                const windMax = daily.wind_speed_10m_max[idx]
-                const precip = daily.precipitation_sum[idx]
-
+          <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6" aria-label="Daily temperature forecast values">
+            <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Daily values</h3>
+            <ol className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {days.map((day, index) => {
+                const date = formatLocalDate(day.date)
                 return (
-                  <div
-                    key={dayTime}
-                    className={`p-3.5 rounded-xl border flex flex-col justify-between ${
-                      isToday
-                        ? 'bg-slate-800/80 border-teal-500/50 shadow-md'
-                        : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-white">{dayName}</span>
-                        {isToday && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-teal-500/20 text-teal-300 font-medium">
-                            Current
-                          </span>
-                        )}
+                  <li key={day.date} className={`day-card rounded-panel border border-border border-t-4 p-4 shadow-sm ${temperatureCardTone(day.high)} ${index === 0 ? 'ring-1 ring-accent/40' : ''}`}>
+                    <p className="font-medium text-ink">{date.weekday}</p>
+                    <p className="mt-1 text-sm text-muted">{date.fullDate} (India local date)</p>
+                    <dl className="mt-4 space-y-2 text-sm">
+                      <div className="flex justify-between gap-2">
+                        <dt className="text-ink-soft">High</dt>
+                        <dd className={`font-semibold ${temperatureTone(day.high)}`}>{formatValue(day.high)}</dd>
                       </div>
-                      <div className="text-[11px] text-slate-400 mb-3">{fullDate}</div>
-
-                      {/* Temperature Metrics */}
-                      <div className="space-y-1 mb-3">
-                        <div className="text-xs text-slate-400 flex justify-between">
-                          <span>Tmax:</span>
-                          <span className="font-bold text-amber-300 font-mono">
-                            {tmax !== null && tmax !== undefined ? `${tmax.toFixed(1)}°C` : '--'}
-                          </span>
-                        </div>
-                        <div className="text-xs text-slate-400 flex justify-between">
-                          <span>Tmin:</span>
-                          <span className="text-sky-300 font-mono">
-                            {tmin !== null && tmin !== undefined ? `${tmin.toFixed(1)}°C` : '--'}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-slate-500 flex justify-between pt-1 border-t border-slate-800/60">
-                          <span>Feels max:</span>
-                          <span className="text-slate-300 font-mono">
-                            {apparentMax !== null && apparentMax !== undefined ? `${apparentMax.toFixed(1)}°C` : '--'}
-                          </span>
-                        </div>
+                      <div className="flex justify-between gap-2">
+                        <dt className="text-ink-soft">Low</dt>
+                        <dd className={`font-semibold ${temperatureTone(day.low)}`}>{formatValue(day.low)}</dd>
                       </div>
-                    </div>
-
-                    {/* Secondary Weather Parameters */}
-                    <div className="space-y-1 pt-2 border-t border-slate-800/60 text-[11px] text-slate-400">
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1 text-[10px]">
-                          <Wind className="w-3 h-3 text-slate-500" />
-                          <span>Wind:</span>
-                        </span>
-                        <span className="font-mono text-slate-300 text-[10px]">
-                          {windMax !== null && windMax !== undefined ? `${windMax.toFixed(1)} m/s` : '--'}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1 text-[10px]">
-                          <Droplets className="w-3 h-3 text-sky-500" />
-                          <span>Precip:</span>
-                        </span>
-                        <span className="font-mono text-slate-300 text-[10px]">
-                          {precip !== null && precip !== undefined ? `${precip.toFixed(1)} mm` : '0 mm'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                    </dl>
+                  </li>
                 )
               })}
-            </div>
-
-            <div className="p-3 rounded-lg bg-slate-950/40 border border-slate-800 text-[11px] text-slate-400 flex items-center gap-2">
-              <ThermometerSun className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span>
-                <strong>Methodology Note: </strong>
-                Forecast parameters shown above are raw numerical weather model forecasts from Open-Meteo. Heat Action Plan (HAP) color alert classification and thermal stress index projections will be connected in Module 5.
-              </span>
-            </div>
-          </div>
-        ) : (
-          <EmptyState
-            icon={LineChart}
-            title="Numerical Weather Prediction (NWP) Stream Inactive"
-            description={`Click refresh or select a station to retrieve the 7-day numerical weather forecast for ${selectedStation.name}.`}
-            moduleNotice="Module 1 Open-Meteo Forecast Stream"
-            expectedParams={[
-              'Day +1 to Day +7 Daily Tmax / Tmin (°C)',
-              'Apparent Max Temperature (°C)',
-              'Peak Wind Speed (m/s)',
-              'Expected Precipitation (mm)',
-            ]}
-          />
-        )}
-      </div>
-
-      {/* NDMA & IMD Color-Coded Early Warning Matrix */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <BellRing className="w-4 h-4 text-amber-400" />
-            <span>National Disaster Management Authority (NDMA) Alert Matrix Reference</span>
-          </h3>
-          <span className="text-xs text-slate-400 font-mono">Heat Action Plan Guidelines</span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {alertLevels.map((lvl) => (
-            <div
-              key={lvl.level}
-              className={`p-3.5 rounded-xl bg-slate-950/60 border ${lvl.border} flex flex-col justify-between`}
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full font-mono ${lvl.badge}`}>
-                    {lvl.level}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-300 leading-relaxed mb-3">
-                  {lvl.desc}
-                </p>
-              </div>
-              <div className="text-[11px] text-slate-400 pt-2 border-t border-slate-800/80">
-                <strong className="text-slate-300">Action Protocol: </strong>
-                {lvl.action}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+            </ol>
+          </section>
+        </>
+      ) : weatherState.isLoading ? (
+        <p className="rounded-xl border border-border bg-surface p-6 text-sm text-muted shadow-sm" role="status">
+          Loading forecast…
+        </p>
+      ) : !weatherState.error ? (
+        <EmptyState
+          icon={RefreshCw}
+          title="No forecast available"
+          description="There is no daily temperature forecast available."
+        />
+      ) : null}
     </div>
   )
 }
