@@ -3,10 +3,12 @@ HeatTrick Backend - Localized Weather Ingestion & Thermal Stress API
 College Research Project: India Localized Heatwave Early Warning & Thermal Stress Assessment
 """
 
-import asyncio
 import logging
+import math
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from decimal import Decimal, ROUND_DOWN
+from email.utils import parsedate_to_datetime
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query
@@ -40,13 +42,106 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory cache: reuse successful results for five minutes.
-WEATHER_CACHE_TTL = 300
-weather_cache = {}
+# In-memory cache: honor provider expiration headers, with a fallback TTL.
+WEATHER_CACHE_FALLBACK_TTL = 600
+WEATHER_CACHE_STALE_TTL = 600
+WEATHER_CACHE_MAX_ENTRIES = 256
+LOCATIONFORECAST_URL = (
+    "https://api.met.no/weatherapi/locationforecast/2.0/compact"
+)
+METNO_USER_AGENT = (
+    "HeatTrick/0.2.1 (+https://github.com/ayushkumar-devlab/HeatTrick)"
+)
 
 
 def _upstream_error_excerpt(response: httpx.Response) -> str:
     return response.text.replace("\r", " ").replace("\n", " ")[:300]
+
+
+def _truncate_coordinate(value: float) -> float:
+    return float(
+        Decimal(str(value)).quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
+    )
+
+
+def _response_cache_ttl(response: httpx.Response) -> float:
+    expires = response.headers.get("Expires")
+    if expires:
+        try:
+            expires_at = parsedate_to_datetime(expires)
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            return max(
+                0.0,
+                (expires_at - datetime.now(timezone.utc)).total_seconds(),
+            )
+        except (TypeError, ValueError, OverflowError):
+            logger.warning("MET Norway returned an invalid Expires header.")
+
+    return WEATHER_CACHE_FALLBACK_TTL
+
+
+def _number(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if not math.isfinite(value):
+        return None
+    return float(value)
+
+
+def _parse_forecast_time(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError("Forecast timestamps must include a timezone.")
+    return parsed.astimezone(timezone.utc)
+
+
+class CachedWeather:
+    def __init__(
+        self,
+        weather: "WeatherResponse",
+        expires_at: float,
+        last_modified: str | None,
+        retain_until: float,
+    ) -> None:
+        self.weather = weather
+        self.expires_at = expires_at
+        self.last_modified = last_modified
+        self.retain_until = retain_until
+
+
+weather_cache: dict[tuple[float, float], CachedWeather] = {}
+
+
+def _cache_weather(
+    cache_key: tuple[float, float],
+    weather: "WeatherResponse",
+    ttl: float,
+    last_modified: str | None,
+) -> None:
+    now = time.monotonic()
+    weather_cache[cache_key] = CachedWeather(
+        weather=weather,
+        expires_at=now + ttl,
+        last_modified=last_modified,
+        retain_until=now + ttl + WEATHER_CACHE_STALE_TTL,
+    )
+
+    expired_keys = [
+        key
+        for key, value in weather_cache.items()
+        if now >= value.retain_until
+    ]
+    for key in expired_keys:
+        weather_cache.pop(key, None)
+
+    if len(weather_cache) > WEATHER_CACHE_MAX_ENTRIES:
+        oldest_keys = sorted(
+            weather_cache,
+            key=lambda key: weather_cache[key].retain_until,
+        )
+        for key in oldest_keys[: len(weather_cache) - WEATHER_CACHE_MAX_ENTRIES]:
+            weather_cache.pop(key, None)
 
 
 class HealthResponse(BaseModel):
@@ -77,8 +172,13 @@ class DailyForecast(BaseModel):
 
 
 class SourceMetadata(BaseModel):
-    source: str = "Open-Meteo Weather API"
-    model: str = "ECMWF / GFS Global NWP Blend"
+    source: str = (
+        "MET Norway Locationforecast API "
+        "(https://api.met.no/weatherapi/locationforecast/2.0/documentation; "
+        "adapted by HeatTrick; CC BY 4.0: "
+        "https://creativecommons.org/licenses/by/4.0/)"
+    )
+    model: str = "Locationforecast 2.0"
     latitude: float
     longitude: float
     elevation: float | None = None
@@ -125,207 +225,236 @@ async def get_weather(
     ),
 ) -> WeatherResponse:
     """
-    Retrieve current weather and a seven-day forecast from Open-Meteo.
-    Successful responses are cached briefly to reduce repeated API calls.
+    Retrieve current weather and forecast samples from MET Norway.
+    Successful responses are cached according to the provider's HTTP headers.
     """
-
-    # Round coordinates slightly so nearby duplicate requests can share cache.
-    cache_key = (round(latitude, 3), round(longitude, 3))
-    now = time.monotonic()
+    latitude = _truncate_coordinate(latitude)
+    longitude = _truncate_coordinate(longitude)
+    cache_key = (latitude, longitude)
     cached = weather_cache.get(cache_key)
+    now = time.monotonic()
 
-    if cached and now - cached[0] < WEATHER_CACHE_TTL:
-        return cached[1]
+    if cached and now < cached.expires_at:
+        return cached.weather
 
-    url = "https://api.open-meteo.com/v1/forecast"
+    headers = {"User-Agent": METNO_USER_AGENT}
+    if cached and cached.last_modified:
+        headers["If-Modified-Since"] = cached.last_modified
 
-    params = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "current": (
-            "temperature_2m,relative_humidity_2m,apparent_temperature,"
-            "dew_point_2m,is_day,precipitation,wind_speed_10m,"
-            "direct_normal_irradiance"
-        ),
-        "daily": (
-            "temperature_2m_max,temperature_2m_min,"
-            "apparent_temperature_max,apparent_temperature_min,"
-            "precipitation_sum,wind_speed_10m_max"
-        ),
-        "timezone": "auto",
-        "wind_speed_unit": "ms",
-    }
-
-    data = None
-
-    # Retry temporary timeouts, rate limits and provider server errors.
-    for attempt in range(3):
-        try:
-            async with httpx.AsyncClient(
-                timeout=httpx.Timeout(20.0, connect=10.0)
-            ) as client:
-                response = await client.get(url, params=params)
-
-            if (
-                response.status_code == 429
-                or response.status_code >= 500
-            ):
-                if attempt < 2:
-                    await asyncio.sleep(1.5 * (attempt + 1))
-                    continue
-
-                logger.warning(
-                    "Open-Meteo returned HTTP %s after %s attempts: %s",
-                    response.status_code,
-                    attempt + 1,
-                    _upstream_error_excerpt(response),
-                )
-                raise HTTPException(
-                    status_code=503,
-                    detail=(
-                        "Open-Meteo is temporarily rate-limited or "
-                        "unavailable. Please try again later."
-                    ),
-                )
-
-            response.raise_for_status()
-            data = response.json()
-            break
-
-        except HTTPException:
-            raise
-
-        except httpx.TimeoutException:
-            if attempt < 2:
-                await asyncio.sleep(1.5 * (attempt + 1))
-                continue
-
-            raise HTTPException(
-                status_code=504,
-                detail=(
-                    "Open-Meteo did not respond after multiple attempts. "
-                    "Please try again shortly."
-                ),
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(20.0, connect=10.0)
+        ) as client:
+            response = await client.get(
+                LOCATIONFORECAST_URL,
+                params={"lat": latitude, "lon": longitude},
+                headers=headers,
             )
-
-        except httpx.HTTPStatusError as err:
-            logger.warning(
-                "Open-Meteo returned HTTP %s: %s",
-                err.response.status_code,
-                _upstream_error_excerpt(err.response),
-            )
-            raise HTTPException(
-                status_code=502,
-                detail=(
-                    "Open-Meteo returned HTTP "
-                    f"{err.response.status_code}."
-                ),
-            )
-
-        except httpx.RequestError as err:
-            if attempt < 2:
-                await asyncio.sleep(1.5 * (attempt + 1))
-                continue
-
-            logger.warning(
-                "Open-Meteo request failed after %s attempts (%s): %s",
-                attempt + 1,
-                type(err).__name__,
-                err,
-            )
-            raise HTTPException(
-                status_code=503,
-                detail="Unable to connect to the Open-Meteo service.",
-            )
-
-        except ValueError:
-            raise HTTPException(
-                status_code=502,
-                detail="Open-Meteo returned invalid JSON.",
-            )
-
-    if data is None:
+    except httpx.TimeoutException as err:
+        logger.warning("MET Norway request timed out: %s", err)
+        raise HTTPException(
+            status_code=504,
+            detail="MET Norway did not respond before the request timed out.",
+        )
+    except httpx.RequestError as err:
+        logger.warning(
+            "MET Norway request failed (%s): %s",
+            type(err).__name__,
+            err,
+        )
         raise HTTPException(
             status_code=503,
-            detail="Weather data is temporarily unavailable.",
+            detail="Unable to connect to the MET Norway weather service.",
         )
 
-    # Validate the response structure before constructing our models.
-    raw_current = data.get("current")
-    raw_daily = data.get("daily")
+    if response.status_code == 304:
+        if cached is None:
+            logger.warning("MET Norway returned 304 without a cached forecast.")
+            raise HTTPException(
+                status_code=502,
+                detail="MET Norway returned an unusable not-modified response.",
+            )
+        weather = cached.weather
+        _cache_weather(
+            cache_key,
+            weather,
+            _response_cache_ttl(response),
+            response.headers.get("Last-Modified") or cached.last_modified,
+        )
+        return weather
 
-    if not isinstance(raw_current, dict) or not isinstance(raw_daily, dict):
+    if response.status_code == 203:
+        logger.warning("MET Norway reports that Locationforecast is deprecated.")
+
+    if response.status_code == 429 or response.status_code >= 500:
+        logger.warning(
+            "MET Norway returned HTTP %s: %s",
+            response.status_code,
+            _upstream_error_excerpt(response),
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="MET Norway is temporarily rate-limited or unavailable.",
+        )
+
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as err:
+        logger.warning(
+            "MET Norway returned HTTP %s: %s",
+            err.response.status_code,
+            _upstream_error_excerpt(err.response),
+        )
         raise HTTPException(
             status_code=502,
-            detail="Invalid weather response received from Open-Meteo.",
+            detail=f"MET Norway returned HTTP {err.response.status_code}.",
         )
 
-    units: dict[str, str] = {}
+    try:
+        payload = response.json()
+    except ValueError:
+        logger.warning("MET Norway returned invalid JSON.")
+        raise HTTPException(
+            status_code=502,
+            detail="MET Norway returned invalid JSON.",
+        )
 
-    current_units = data.get("current_units")
-    daily_units = data.get("daily_units")
+    try:
+        if not isinstance(payload, dict):
+            raise ValueError("Forecast payload is not an object.")
+        properties = payload.get("properties")
+        if not isinstance(properties, dict):
+            raise ValueError("Forecast properties are missing.")
+        metadata = properties.get("meta")
+        if not isinstance(metadata, dict):
+            raise ValueError("Forecast metadata is missing.")
+        provider_units = metadata.get("units", {})
+        timeseries = properties.get("timeseries")
+        if not isinstance(provider_units, dict):
+            raise ValueError("Forecast units are invalid.")
+        if not isinstance(timeseries, list) or not timeseries:
+            raise ValueError("Forecast timeseries is missing or empty.")
 
-    if isinstance(current_units, dict):
-        units.update(current_units)
+        parsed_steps: list[tuple[str, datetime, dict]] = []
+        for step in timeseries:
+            step_time = step["time"]
+            details = step["data"]["instant"]["details"]
+            if not isinstance(step_time, str) or not isinstance(details, dict):
+                raise ValueError("Invalid time-series entry.")
+            parsed_steps.append(
+                (step_time, _parse_forecast_time(step_time), details)
+            )
+    except (KeyError, TypeError, ValueError) as err:
+        logger.warning("MET Norway returned an invalid forecast structure: %s", err)
+        raise HTTPException(
+            status_code=502,
+            detail="Invalid forecast response received from MET Norway.",
+        )
 
-    if isinstance(daily_units, dict):
-        units.update(daily_units)
+    current_time, _, current_details = parsed_steps[0]
+    daily_values: dict[date, dict[str, list[float]]] = {}
+    for _, forecast_time, details in parsed_steps:
+        day = forecast_time.date()
+        values = daily_values.setdefault(
+            day, {"temperature": [], "wind_speed": []}
+        )
+        temperature = _number(details.get("air_temperature"))
+        wind_speed = _number(details.get("wind_speed"))
+        if temperature is not None:
+            values["temperature"].append(temperature)
+        if wind_speed is not None:
+            values["wind_speed"].append(wind_speed)
 
-    current_model = CurrentWeather(
-        time=str(raw_current.get("time", "")),
-        temperature_2m=raw_current.get("temperature_2m"),
-        relative_humidity_2m=raw_current.get("relative_humidity_2m"),
-        apparent_temperature=raw_current.get("apparent_temperature"),
-        dew_point_2m=raw_current.get("dew_point_2m"),
-        wind_speed_10m=raw_current.get("wind_speed_10m"),
-        direct_normal_irradiance=raw_current.get(
-            "direct_normal_irradiance"
-        ),
-        is_day=raw_current.get("is_day"),
-        precipitation=raw_current.get("precipitation"),
-    )
-
+    forecast_days = sorted(daily_values)[:7]
     daily_model = DailyForecast(
-        time=raw_daily.get("time", []),
-        temperature_2m_max=raw_daily.get("temperature_2m_max", []),
-        temperature_2m_min=raw_daily.get("temperature_2m_min", []),
-        apparent_temperature_max=raw_daily.get(
-            "apparent_temperature_max", []
-        ),
-        apparent_temperature_min=raw_daily.get(
-            "apparent_temperature_min", []
-        ),
-        wind_speed_10m_max=raw_daily.get("wind_speed_10m_max", []),
-        precipitation_sum=raw_daily.get("precipitation_sum", []),
+        time=[day.isoformat() for day in forecast_days],
+        temperature_2m_max=[
+            max(daily_values[day]["temperature"])
+            if daily_values[day]["temperature"]
+            else None
+            for day in forecast_days
+        ],
+        temperature_2m_min=[
+            min(daily_values[day]["temperature"])
+            if daily_values[day]["temperature"]
+            else None
+            for day in forecast_days
+        ],
+        apparent_temperature_max=[None] * len(forecast_days),
+        apparent_temperature_min=[None] * len(forecast_days),
+        wind_speed_10m_max=[
+            max(daily_values[day]["wind_speed"])
+            if daily_values[day]["wind_speed"]
+            else None
+            for day in forecast_days
+        ],
+        precipitation_sum=[None] * len(forecast_days),
     )
 
-    metadata_model = SourceMetadata(
-        source="Open-Meteo Weather API",
-        model="ECMWF / GFS Global NWP Blend",
-        latitude=float(data.get("latitude", latitude)),
-        longitude=float(data.get("longitude", longitude)),
-        elevation=data.get("elevation"),
-        timezone=data.get("timezone"),
-        retrieved_at=datetime.now(timezone.utc).isoformat(),
+    units = {
+        api_name: provider_units[provider_name]
+        for api_name, provider_name in {
+            "temperature_2m": "air_temperature",
+            "temperature_2m_max": "air_temperature_max",
+            "temperature_2m_min": "air_temperature_min",
+            "relative_humidity_2m": "relative_humidity",
+            "dew_point_2m": "dew_point_temperature",
+            "wind_speed_10m": "wind_speed",
+            "wind_speed_10m_max": "wind_speed",
+        }.items()
+        if isinstance(provider_units.get(provider_name), str)
+    }
+
+    geometry = payload.get("geometry")
+    coordinates = (
+        geometry.get("coordinates", [])
+        if isinstance(geometry, dict)
+        else []
     )
+    if (
+        isinstance(coordinates, list)
+        and len(coordinates) >= 2
+        and _number(coordinates[0]) is not None
+        and _number(coordinates[1]) is not None
+    ):
+        result_longitude = float(coordinates[0])
+        result_latitude = float(coordinates[1])
+        elevation = _number(coordinates[2]) if len(coordinates) > 2 else None
+    else:
+        result_latitude = latitude
+        result_longitude = longitude
+        elevation = None
 
     result = WeatherResponse(
-        current=current_model,
+        current=CurrentWeather(
+            time=current_time,
+            temperature_2m=_number(current_details.get("air_temperature")),
+            relative_humidity_2m=_number(
+                current_details.get("relative_humidity")
+            ),
+            apparent_temperature=None,
+            dew_point_2m=_number(current_details.get("dew_point_temperature")),
+            wind_speed_10m=_number(current_details.get("wind_speed")),
+            direct_normal_irradiance=None,
+            is_day=None,
+            precipitation=None,
+        ),
         daily=daily_model,
         units=units,
-        metadata=metadata_model,
+        metadata=SourceMetadata(
+            latitude=result_latitude,
+            longitude=result_longitude,
+            elevation=elevation,
+            timezone="UTC",
+            retrieved_at=datetime.now(timezone.utc).isoformat(),
+        ),
     )
 
-    # Cache only successful responses.
-    weather_cache[cache_key] = (time.monotonic(), result)
-
-    # Remove expired entries to prevent unbounded cache growth.
-    expired_keys = [
-        key
-        for key, value in weather_cache.items()
-        if time.monotonic() - value[0] >= WEATHER_CACHE_TTL
-    ]
-    for key in expired_keys:
-        weather_cache.pop(key, None)
+    _cache_weather(
+        cache_key,
+        result,
+        _response_cache_ttl(response),
+        response.headers.get("Last-Modified"),
+    )
 
     return result
