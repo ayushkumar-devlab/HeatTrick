@@ -1,5 +1,7 @@
 import sys
 from pathlib import Path
+
+import httpx
 import pytest
 from starlette.testclient import TestClient
 
@@ -7,7 +9,9 @@ backend_dir = Path(__file__).resolve().parent.parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
-from main import app
+import main
+
+app = main.app
 
 client = TestClient(app)
 
@@ -66,3 +70,82 @@ def test_weather_valid_coordinates():
     metadata = data["metadata"]
     assert metadata["source"] == "Open-Meteo Weather API"
     assert "retrieved_at" in metadata
+
+
+def test_weather_logs_upstream_error_after_retries(monkeypatch, caplog):
+    attempts = []
+
+    class UnavailableOpenMeteoClient:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            return None
+
+        async def get(self, url, params):
+            attempts.append((url, params))
+            return httpx.Response(503, text="temporary upstream failure")
+
+    async def skip_retry_delay(_seconds):
+        return None
+
+    monkeypatch.setattr(main, "weather_cache", {})
+    monkeypatch.setattr(main.httpx, "AsyncClient", UnavailableOpenMeteoClient)
+    monkeypatch.setattr(main.asyncio, "sleep", skip_retry_delay)
+
+    response = client.get(
+        "/api/weather?latitude=28.5833&longitude=77.2083"
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": (
+            "Open-Meteo is temporarily rate-limited or "
+            "unavailable. Please try again later."
+        )
+    }
+    assert len(attempts) == 3
+    assert "Open-Meteo returned HTTP 503 after 3 attempts" in caplog.text
+    assert "temporary upstream failure" in caplog.text
+
+
+def test_weather_logs_connection_error_after_retries(monkeypatch, caplog):
+    attempts = []
+
+    class UnreachableOpenMeteoClient:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            return None
+
+        async def get(self, url, params):
+            attempts.append((url, params))
+            raise httpx.ConnectError("connection refused")
+
+    async def skip_retry_delay(_seconds):
+        return None
+
+    monkeypatch.setattr(main, "weather_cache", {})
+    monkeypatch.setattr(main.httpx, "AsyncClient", UnreachableOpenMeteoClient)
+    monkeypatch.setattr(main.asyncio, "sleep", skip_retry_delay)
+
+    response = client.get(
+        "/api/weather?latitude=28.5833&longitude=77.2083"
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Unable to connect to the Open-Meteo service."
+    }
+    assert len(attempts) == 3
+    assert "Open-Meteo request failed after 3 attempts (ConnectError)" in (
+        caplog.text
+    )
+    assert "connection refused" in caplog.text

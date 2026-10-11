@@ -4,6 +4,7 @@ College Research Project: India Localized Heatwave Early Warning & Thermal Stres
 """
 
 import asyncio
+import logging
 import time
 from datetime import datetime, timezone
 
@@ -21,6 +22,8 @@ app = FastAPI(
     ),
     version="0.2.1",
 )
+
+logger = logging.getLogger(__name__)
 
 # Allow the local frontend and deployed Vercel frontend.
 origins = [
@@ -40,6 +43,10 @@ app.add_middleware(
 # In-memory cache: reuse successful results for five minutes.
 WEATHER_CACHE_TTL = 300
 weather_cache = {}
+
+
+def _upstream_error_excerpt(response: httpx.Response) -> str:
+    return response.text.replace("\r", " ").replace("\n", " ")[:300]
 
 
 class HealthResponse(BaseModel):
@@ -167,6 +174,12 @@ async def get_weather(
                     await asyncio.sleep(1.5 * (attempt + 1))
                     continue
 
+                logger.warning(
+                    "Open-Meteo returned HTTP %s after %s attempts: %s",
+                    response.status_code,
+                    attempt + 1,
+                    _upstream_error_excerpt(response),
+                )
                 raise HTTPException(
                     status_code=503,
                     detail=(
@@ -196,6 +209,11 @@ async def get_weather(
             )
 
         except httpx.HTTPStatusError as err:
+            logger.warning(
+                "Open-Meteo returned HTTP %s: %s",
+                err.response.status_code,
+                _upstream_error_excerpt(err.response),
+            )
             raise HTTPException(
                 status_code=502,
                 detail=(
@@ -204,11 +222,17 @@ async def get_weather(
                 ),
             )
 
-        except httpx.RequestError:
+        except httpx.RequestError as err:
             if attempt < 2:
                 await asyncio.sleep(1.5 * (attempt + 1))
                 continue
 
+            logger.warning(
+                "Open-Meteo request failed after %s attempts (%s): %s",
+                attempt + 1,
+                type(err).__name__,
+                err,
+            )
             raise HTTPException(
                 status_code=503,
                 detail="Unable to connect to the Open-Meteo service.",
