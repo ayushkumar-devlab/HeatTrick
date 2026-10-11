@@ -123,4 +123,4 @@ Built by Ayush Kumar, ECE undergraduate at RV Institute of Technology and Manage
 
 Weather data: © MET Norway, CC BY 4.0.
 
-_Add your licence here (for example MIT) if you want others to reuse the code._
+Code released under the [MIT License](LICENSE).
