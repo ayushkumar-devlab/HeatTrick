@@ -16,6 +16,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from backend.routers.science import router as science_router
 
 app = FastAPI(
     title="HeatTrick API",
@@ -42,6 +43,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(science_router)
 
 # In-memory cache: honor provider expiration headers, with a fallback TTL.
 WEATHER_CACHE_FALLBACK_TTL = 600

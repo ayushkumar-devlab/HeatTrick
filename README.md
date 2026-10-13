@@ -78,13 +78,12 @@ You need Python 3.10+ and Node.js 18+.
 **1. Backend**
 
 ```powershell
-cd backend
-python -m venv venv
-.\venv\Scripts\python.exe -m pip install -r requirements.txt
-.\venv\Scripts\python.exe -m uvicorn main:app --port 8000
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
-It listens on http://127.0.0.1:8000, with interactive docs at `/docs`. Keep this terminal open.
+Run these commands from the repository root. The backend listens on http://127.0.0.1:8000, with interactive docs at `/docs`. Keep this terminal open.
 
 **2. Frontend** (in a second terminal)
 

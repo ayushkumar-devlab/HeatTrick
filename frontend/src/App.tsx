@@ -10,6 +10,7 @@ import { ThermalStressView } from './components/views/ThermalStressView'
 import { ForecastView } from './components/views/ForecastView'
 import { MethodologyView } from './components/views/MethodologyView'
 import { Footer } from './components/Footer'
+import { StatusBanner } from './components/StatusBanner'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
@@ -173,12 +174,18 @@ export default function App() {
         )}
 
         {activeTab === 'overview' && (
-          <OverviewView
-            selectedStation={selectedStation}
-            weatherState={visibleWeatherState}
-            onRefreshWeather={handleRefreshWeather}
-            onNavigateToTab={setActiveTab}
-          />
+          <>
+            <StatusBanner
+              selectedStation={selectedStation}
+              weatherState={visibleWeatherState}
+            />
+            <OverviewView
+              selectedStation={selectedStation}
+              weatherState={visibleWeatherState}
+              onRefreshWeather={handleRefreshWeather}
+              onNavigateToTab={setActiveTab}
+            />
+          </>
         )}
         {activeTab === 'heatwave' && (
           <HeatwaveView

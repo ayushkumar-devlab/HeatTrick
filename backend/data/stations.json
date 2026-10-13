@@ -1,0 +1,65 @@
+[
+  {
+    "id": "DEL-01",
+    "name": "New Delhi (Safdarjung)",
+    "latitude": 28.5833,
+    "longitude": 77.2083,
+    "imdCriteriaType": "Plains"
+  },
+  {
+    "id": "NAG-02",
+    "name": "Nagpur (Sonegaon)",
+    "latitude": 21.0922,
+    "longitude": 79.0558,
+    "imdCriteriaType": "Plains"
+  },
+  {
+    "id": "KOL-03",
+    "name": "Kolkata (Alipore)",
+    "latitude": 22.5333,
+    "longitude": 88.3333,
+    "imdCriteriaType": "Coastal"
+  },
+  {
+    "id": "AHM-04",
+    "name": "Ahmedabad",
+    "latitude": 23.0333,
+    "longitude": 72.5833,
+    "imdCriteriaType": "Plains"
+  },
+  {
+    "id": "CHE-05",
+    "name": "Chennai (Meenambakkam)",
+    "latitude": 13.0,
+    "longitude": 80.1833,
+    "imdCriteriaType": "Coastal"
+  },
+  {
+    "id": "HYD-06",
+    "name": "Hyderabad (Begumpet)",
+    "latitude": 17.45,
+    "longitude": 78.4667,
+    "imdCriteriaType": "Plains"
+  },
+  {
+    "id": "SHI-07",
+    "name": "Shimla",
+    "latitude": 31.1048,
+    "longitude": 77.1734,
+    "imdCriteriaType": "Hilly"
+  },
+  {
+    "id": "BLR-08",
+    "name": "Bengaluru",
+    "latitude": 12.9716,
+    "longitude": 77.5946,
+    "imdCriteriaType": "Plains"
+  },
+  {
+    "id": "BLR-JPN-09",
+    "name": "J.P. Nagar, Bengaluru",
+    "latitude": 12.9071,
+    "longitude": 77.5856,
+    "imdCriteriaType": "Plains"
+  }
+]
