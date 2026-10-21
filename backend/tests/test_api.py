@@ -93,6 +93,109 @@ def test_health_check():
     assert data["app"] == "HeatTrick"
 
 
+def test_thermal_endpoint_returns_full_frontend_schema():
+    response = client.get(
+        "/api/thermal",
+        params={"temp_c": 32.2, "rh": 70},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert set(data) == {"heat_index", "wet_bulb", "wbgt"}
+    assert set(data["heat_index"]) == {
+        "inputs",
+        "units",
+        "method",
+        "citation_keys",
+        "limitations",
+        "value_c",
+        "value_f",
+        "band",
+        "method_used",
+        "adjustment_applied",
+    }
+    assert set(data["wet_bulb"]) == {
+        "inputs",
+        "units",
+        "method",
+        "citation_keys",
+        "limitations",
+        "value_c",
+        "out_of_range",
+    }
+    assert set(data["wbgt"]) == {
+        "inputs",
+        "units",
+        "method",
+        "citation_keys",
+        "limitations",
+        "value_c",
+        "label",
+    }
+    assert data["heat_index"]["inputs"] == {"temp_c": 32.2, "rh": 70.0}
+    assert isinstance(data["heat_index"]["value_c"], float)
+    assert isinstance(data["heat_index"]["value_f"], float)
+    assert isinstance(data["heat_index"]["band"], str)
+    assert isinstance(data["heat_index"]["method_used"], str)
+    assert (
+        data["heat_index"]["adjustment_applied"] is None
+        or isinstance(data["heat_index"]["adjustment_applied"], str)
+    )
+    assert isinstance(data["wet_bulb"]["value_c"], float)
+    assert isinstance(data["wet_bulb"]["out_of_range"], bool)
+    assert isinstance(data["wbgt"]["value_c"], float)
+    assert data["wbgt"]["label"] == "estimate, shade/no-radiation"
+    for result in data.values():
+        assert isinstance(result["method"], str)
+        assert isinstance(result["units"], dict)
+        assert isinstance(result["citation_keys"], list)
+        assert isinstance(result["limitations"], list)
+
+
+@pytest.mark.parametrize(
+    ("temp_c", "rh", "out_of_range"),
+    [
+        (-20, 5, False),
+        (50, 99, False),
+        (30, 0, True),
+        (30, 100, True),
+    ],
+)
+def test_thermal_endpoint_accepts_formula_boundaries(
+    temp_c, rh, out_of_range
+):
+    response = client.get(
+        "/api/thermal",
+        params={"temp_c": temp_c, "rh": rh},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["wet_bulb"]["out_of_range"] is out_of_range
+
+
+@pytest.mark.parametrize(
+    ("params", "detail"),
+    [
+        ({"rh": 50}, None),
+        ({"temp_c": 30}, None),
+        ({"temp_c": "nan", "rh": 50}, None),
+        ({"temp_c": "inf", "rh": 50}, None),
+        ({"temp_c": 30, "rh": -0.1}, "rh must be between 0 and 100 percent."),
+        ({"temp_c": 30, "rh": 100.1}, "rh must be between 0 and 100 percent."),
+        (
+            {"temp_c": -237.7, "rh": 50},
+            "temp_c makes the vapor-pressure formula undefined.",
+        ),
+    ],
+)
+def test_thermal_endpoint_rejects_invalid_inputs(params, detail):
+    response = client.get("/api/thermal", params=params)
+
+    assert response.status_code == 422
+    if detail is not None:
+        assert response.json()["detail"] == detail
+
+
 def test_weather_invalid_latitude():
     # Latitude > 90 must fail Pydantic validation with 422
     response = client.get("/api/weather?latitude=95.0&longitude=77.2")

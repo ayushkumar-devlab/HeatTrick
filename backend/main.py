@@ -17,6 +17,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from backend.routers.science import router as science_router
+from backend.science.thermal import (
+    HeatIndexResult,
+    WBGTResult,
+    WetBulbResult,
+    heat_index_noaa,
+    wbgt_estimate_bom,
+    wet_bulb_stull,
+)
 
 app = FastAPI(
     title="HeatTrick API",
@@ -153,6 +161,12 @@ class HealthResponse(BaseModel):
     app: str
 
 
+class ThermalResponse(BaseModel):
+    heat_index: HeatIndexResult
+    wet_bulb: WetBulbResult
+    wbgt: WBGTResult
+
+
 class CurrentWeather(BaseModel):
     time: str
     temperature_2m: float | None = None
@@ -211,6 +225,30 @@ def read_root():
 def get_health() -> HealthResponse:
     """Verify that the HeatTrick backend is running."""
     return HealthResponse(status="ok", app="HeatTrick")
+
+
+@app.get("/api/thermal", response_model=ThermalResponse)
+def get_thermal(
+    temp_c: float = Query(
+        ...,
+        description="Air temperature in degrees Celsius",
+        allow_inf_nan=False,
+    ),
+    rh: float = Query(
+        ...,
+        description="Relative humidity in percent",
+        allow_inf_nan=False,
+    ),
+) -> ThermalResponse:
+    """Calculate heat index, wet-bulb temperature, and estimated WBGT."""
+    try:
+        return ThermalResponse(
+            heat_index=heat_index_noaa(temp_c, rh),
+            wet_bulb=wet_bulb_stull(temp_c, rh),
+            wbgt=wbgt_estimate_bom(temp_c, rh),
+        )
+    except ValueError as err:
+        raise HTTPException(status_code=422, detail=str(err)) from err
 
 
 @app.get("/api/weather", response_model=WeatherResponse)

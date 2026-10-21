@@ -1,5 +1,10 @@
+import { useEffect, useState } from 'react'
 import { Leaf, RefreshCw } from 'lucide-react'
 import type { ActiveTab, WeatherState } from '../types'
+import {
+  getWeatherDataFreshness,
+  WEATHER_CACHE_TTL_MS,
+} from '../services/weather'
 import { NavigationTabs } from './NavigationTabs'
 
 interface NavbarProps {
@@ -23,16 +28,33 @@ function formatLastSuccess(lastFetched: string | null) {
 
 export function Navbar({ activeTab, onTabChange, weatherState, onRetry }: NavbarProps) {
   const { data, error, isLoading, lastFetched } = weatherState
+  const [, setFreshnessCheck] = useState(0)
+  const isStale = getWeatherDataFreshness(lastFetched)
+
+  useEffect(() => {
+    if (!lastFetched) return
+    const fetchedAt = new Date(lastFetched).getTime()
+    const timeout = window.setTimeout(
+      () => setFreshnessCheck((check) => check + 1),
+      Math.max(0, fetchedAt + WEATHER_CACHE_TTL_MS - Date.now()),
+    )
+    return () => window.clearTimeout(timeout)
+  }, [lastFetched])
+
   const status = isLoading
-    ? 'Updating'
+    ? data && isStale
+      ? `Updating · earlier data · ${formatLastSuccess(lastFetched)}`
+      : 'Updating'
     : error && data
       ? `Earlier data · ${formatLastSuccess(lastFetched)}`
       : error
         ? 'Unavailable'
         : data
-        ? `Live · updated ${formatLastSuccess(lastFetched)}`
+        ? isStale
+          ? `Earlier data · ${formatLastSuccess(lastFetched)}`
+          : `Live · updated ${formatLastSuccess(lastFetched)}`
           : 'Unavailable'
-  const statusDot = error
+  const statusDot = error || (isStale && data)
     ? data ? 'bg-status-amber' : 'bg-status-red'
     : isLoading ? 'bg-status-amber' : 'bg-status-green'
 

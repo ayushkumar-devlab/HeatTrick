@@ -12,7 +12,7 @@ It started as a college research project on localized heatwave early warning and
 
 - **Overview:** a plain-language headline such as "Forecast high of 33.4 °C is 6.6 °C below the 40 °C line IMD uses for heatwaves on the plains", the current temperature, today's high and low, and a 7-day chart of daily highs.
 - **Heatwave Analysis:** compares the forecast high with the base thresholds for plains, coastal and hilly stations (40 °C, 37 °C and 30 °C). It is a basic threshold check, not an official classification.
-- **Thermal Stress:** computes the NOAA Heat Index from air temperature and humidity, and a dew point derived from the same two values. It only shows a number when the inputs are valid.
+- **Thermal Stress:** computes the NOAA Heat Index, Stull wet-bulb temperature and a shade/no-radiation WBGT estimate from air temperature and humidity, plus a dew point derived from the same two values. The WBGT is explicitly an estimate, not a measurement; values are shown only when the inputs are valid.
 - **Forecast:** the full 7-day outlook with daily highs and lows.
 - **Methods & sources:** how everything is calculated, where the data comes from, and what the app cannot do.
 
@@ -24,7 +24,7 @@ Being honest about this matters more than looking impressive:
 
 - It does not issue heatwave warnings or alerts.
 - It does not know a station's climatological normal, so IMD's "departure from normal" rule can't be applied. The app says when a heatwave "can't be confirmed" for that reason.
-- WBGT and other solar-radiation-based indices are not computed, because the weather source doesn't provide solar radiation. They're listed as planned.
+- A measured or solar-radiation-based WBGT is not computed because the weather source doesn't provide solar radiation. Thermal Stress shows only an explicitly labelled shade/no-radiation WBGT estimate.
 - There is no machine learning, vulnerability mapping or mortality modelling.
 
 ## Where the data comes from
@@ -68,6 +68,7 @@ HeatTrick/
 |---|---|
 | `GET /api/health` | `{"status": "ok", "app": "HeatTrick"}` |
 | `GET /api/weather?latitude=..&longitude=..` | Current conditions, 7-day daily highs and lows, units and source metadata |
+| `GET /api/thermal?temp_c=..&rh=..` | NOAA Heat Index, Stull wet-bulb result, and an explicitly labelled shade/no-radiation WBGT estimate, with calculation methods and limitations |
 
 Fields the source doesn't provide come back as `null`, and the frontend shows them as missing, never as zero. Responses are cached on the server according to MET Norway's cache headers.
 
@@ -104,10 +105,10 @@ cd frontend; npm.cmd run build; npm.cmd run lint
 
 ## Deployment
 
-- **Backend (Render):** root directory `backend`, build command `pip install -r requirements.txt`, start command `uvicorn main:app --host 0.0.0.0 --port $PORT`.
+- **Backend (Render):** root directory `.`, build command `pip install -r backend/requirements.txt`, start command `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`. The repository root is required because the app imports modules from the `backend` package.
 - **Frontend (Vercel):** root directory `frontend`, build command `npm run build`, output directory `dist`. Set the environment variable `VITE_API_BASE_URL` to the backend's URL (no trailing slash).
 - The backend only accepts browser requests from the origins listed in `main.py`. If you deploy the frontend to a new domain, add it there.
-- On Render's free plan the backend sleeps when idle, so the first request after a break can take up to a minute.
+- On Render's free plan the backend sleeps when idle, so the first request after a break can take up to a minute. The frontend retains each station's last successful response in browser storage, considers it fresh for five minutes, and displays it while refreshing; older data is identified as earlier data.
 
 ## Roadmap
 

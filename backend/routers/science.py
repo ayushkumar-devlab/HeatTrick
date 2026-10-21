@@ -2,7 +2,7 @@ import json
 from datetime import date
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from backend.science.climatology import get_climatology, get_normal
@@ -12,23 +12,9 @@ from backend.science.heatwave import (
     Region,
     evaluate_consecutive,
 )
-from backend.science.thermal import (
-    HeatIndexResult,
-    WBGTResult,
-    WetBulbResult,
-    heat_index_noaa,
-    wbgt_estimate_bom,
-    wet_bulb_stull,
-)
 
 router = APIRouter(prefix="/api")
 STATIONS_PATH = Path(__file__).resolve().parents[1] / "data" / "stations.json"
-
-
-class ThermalResponse(BaseModel):
-    heat_index: HeatIndexResult
-    wet_bulb: WetBulbResult
-    wbgt: WBGTResult
 
 
 class HeatwaveDayRequest(BaseModel):
@@ -62,21 +48,6 @@ class HeatwaveDiagnoseResponse(BaseModel):
     result: HeatwaveEvaluation
     basis: ClimatologyBasis
     limitations: list[str]
-
-
-@router.get("/thermal", response_model=ThermalResponse)
-def get_thermal(
-    temp_c: float = Query(..., description="Air temperature in degrees Celsius"),
-    rh: float = Query(..., description="Relative humidity in percent"),
-) -> ThermalResponse:
-    try:
-        return ThermalResponse(
-            heat_index=heat_index_noaa(temp_c, rh),
-            wet_bulb=wet_bulb_stull(temp_c, rh),
-            wbgt=wbgt_estimate_bom(temp_c, rh),
-        )
-    except ValueError as err:
-        raise HTTPException(status_code=422, detail=str(err)) from err
 
 
 @router.post("/heatwave/diagnose", response_model=HeatwaveDiagnoseResponse)

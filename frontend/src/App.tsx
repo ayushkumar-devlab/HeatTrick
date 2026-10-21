@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { ActiveTab, Station, WeatherState } from './types'
 import { REFERENCE_STATIONS } from './data/stations'
-import { fetchWeatherData } from './services/weather'
+import { fetchWeatherData, getCachedWeatherData } from './services/weather'
 import { Navbar } from './components/Navbar'
 import { StationSelector } from './components/StationSelector'
 import { OverviewView } from './components/views/OverviewView'
@@ -12,33 +12,40 @@ import { MethodologyView } from './components/views/MethodologyView'
 import { Footer } from './components/Footer'
 import { StatusBanner } from './components/StatusBanner'
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
-  const [selectedStation, setSelectedStation] = useState<Station>(REFERENCE_STATIONS[0])
-  const [weatherState, setWeatherState] = useState<WeatherState>({
-    data: null,
+const DEFAULT_STATION = REFERENCE_STATIONS[0]
+
+function createInitialWeatherState(): WeatherState {
+  const cached = getCachedWeatherData(
+    DEFAULT_STATION.latitude,
+    DEFAULT_STATION.longitude,
+  )
+  return {
+    data: cached?.data ?? null,
     isLoading: true,
     error: null,
-    lastFetched: null,
-    stationId: REFERENCE_STATIONS[0].id,
-  })
+    lastFetched: cached?.fetchedAt ?? null,
+    stationId: DEFAULT_STATION.id,
+  }
+}
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
+  const [selectedStation, setSelectedStation] = useState<Station>(DEFAULT_STATION)
+  const [weatherState, setWeatherState] = useState<WeatherState>(
+    createInitialWeatherState,
+  )
   const requestId = useRef(0)
-  const activeController = useRef<AbortController | null>(null)
 
   const requestWeather = useCallback(async (
     station: Station,
-    controller: AbortController,
     currentRequestId: number,
   ) => {
     try {
       const data = await fetchWeatherData(
         station.latitude,
         station.longitude,
-        controller.signal,
       )
-      if (controller.signal.aborted || currentRequestId !== requestId.current) {
-        return
-      }
+      if (currentRequestId !== requestId.current) return
       setWeatherState({
         data,
         isLoading: false,
@@ -47,9 +54,7 @@ export default function App() {
         stationId: station.id,
       })
     } catch (error: unknown) {
-      if (controller.signal.aborted || currentRequestId !== requestId.current) {
-        return
-      }
+      if (currentRequestId !== requestId.current) return
       setWeatherState((previous) => ({
         ...previous,
         isLoading: false,
@@ -57,87 +62,48 @@ export default function App() {
           ? error.message
           : 'Unable to retrieve weather data.',
       }))
-    } finally {
-      if (activeController.current === controller) {
-        activeController.current = null
-      }
     }
   }, [])
 
   const loadWeather = useCallback(async (
     station: Station,
-    controller: AbortController,
   ) => {
-    activeController.current?.abort()
-    activeController.current = controller
     const currentRequestId = ++requestId.current
+    const cached = getCachedWeatherData(station.latitude, station.longitude)
 
     setWeatherState((previous) => {
       const sameStation = previous.stationId === station.id
       return {
-        data: sameStation ? previous.data : null,
+        data: cached?.data ?? (sameStation ? previous.data : null),
         isLoading: true,
         error: null,
-        lastFetched: sameStation ? previous.lastFetched : null,
+        lastFetched: cached?.fetchedAt ?? (sameStation ? previous.lastFetched : null),
         stationId: station.id,
       }
     })
 
-    await requestWeather(station, controller, currentRequestId)
+    await requestWeather(station, currentRequestId)
   }, [requestWeather])
 
   useEffect(() => {
-    const controller = new AbortController()
-    activeController.current = controller
-    const currentRequestId = ++requestId.current
-    void fetchWeatherData(
-      REFERENCE_STATIONS[0].latitude,
-      REFERENCE_STATIONS[0].longitude,
-      controller.signal,
-    ).then((data) => {
-      if (controller.signal.aborted || currentRequestId !== requestId.current) {
-        return
-      }
-      setWeatherState({
-        data,
-        isLoading: false,
-        error: null,
-        lastFetched: new Date().toISOString(),
-        stationId: REFERENCE_STATIONS[0].id,
-      })
-    }).catch((error: unknown) => {
-      if (controller.signal.aborted || currentRequestId !== requestId.current) {
-        return
-      }
-      setWeatherState((previous) => ({
-        ...previous,
-        isLoading: false,
-        error: error instanceof Error
-          ? error.message
-          : 'Unable to retrieve weather data.',
-      }))
-    }).finally(() => {
-      if (activeController.current === controller) {
-        activeController.current = null
-      }
-    })
+    const timeout = window.setTimeout(() => {
+      const currentRequestId = ++requestId.current
+      void requestWeather(DEFAULT_STATION, currentRequestId)
+    }, 0)
     return () => {
-      controller.abort()
-      if (activeController.current === controller) {
-        requestId.current += 1
-        activeController.current = null
-      }
+      window.clearTimeout(timeout)
+      requestId.current += 1
     }
   }, [requestWeather])
 
   const handleRefreshWeather = useCallback(() => {
     if (weatherState.isLoading) return
-    void loadWeather(selectedStation, new AbortController())
+    void loadWeather(selectedStation)
   }, [loadWeather, selectedStation, weatherState.isLoading])
 
   const handleSelectStation = useCallback((station: Station) => {
     setSelectedStation(station)
-    void loadWeather(station, new AbortController())
+    void loadWeather(station)
   }, [loadWeather])
 
   const visibleWeatherState = weatherState.stationId === selectedStation.id
