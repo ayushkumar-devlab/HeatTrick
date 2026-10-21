@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Leaf, MapPin, RefreshCw } from 'lucide-react'
-import type { ActiveTab, Station, WeatherState } from '../types'
+import { Leaf, RefreshCw } from 'lucide-react'
+import type { ActiveTab, WeatherState } from '../types'
 import {
   getWeatherDataFreshness,
   WEATHER_CACHE_TTL_MS,
@@ -10,7 +10,6 @@ import { NavigationTabs } from './NavigationTabs'
 interface NavbarProps {
   activeTab: ActiveTab
   onTabChange: (tab: ActiveTab) => void
-  selectedStation: Station
   weatherState: WeatherState
   onRetry: () => void
 }
@@ -30,7 +29,6 @@ function formatLastSuccess(lastFetched: string | null) {
 export function Navbar({
   activeTab,
   onTabChange,
-  selectedStation,
   weatherState,
   onRetry,
 }: NavbarProps) {
@@ -74,19 +72,6 @@ export function Navbar({
           <span className="site-header__tagline">Heatwave &amp; Thermal Risk Insights</span>
         </span>
       </a>
-      <div className="site-header__station" role="group" aria-label="Selected station information">
-        <MapPin className="site-header__station-icon" aria-hidden="true" />
-        <span className="site-header__station-name">{selectedStation.name}</span>
-        <span className="site-header__station-detail" aria-label="Elevation">
-          {selectedStation.elevationM} m elevation
-        </span>
-        <span className="site-header__station-detail site-header__station-coordinate" aria-label="Coordinates">
-          {selectedStation.latitude.toFixed(4)}, {selectedStation.longitude.toFixed(4)}
-        </span>
-        <span className="site-header__station-region" aria-label="Region">
-          Region: {selectedStation.zone}
-        </span>
-      </div>
       <div className="site-header__status flex min-w-0 items-center gap-2">
         <div className="min-w-0 text-xs text-forest-text" role="status" aria-live="polite">
           <span className={`mr-2 inline-block h-2 w-2 rounded-full ${statusDot}`} aria-hidden="true" />
