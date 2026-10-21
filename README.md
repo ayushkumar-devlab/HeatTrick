@@ -105,7 +105,7 @@ cd frontend; npm.cmd run build; npm.cmd run lint
 
 ## Deployment
 
-- **Backend (Render):** root directory `.`, build command `pip install -r backend/requirements.txt`, start command `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`. The repository root is required because the app imports modules from the `backend` package.
+- **Backend (Render):** root directory `backend`, build command `pip install -r requirements.txt`, start command `uvicorn main:app --host 0.0.0.0 --port $PORT`. `main.py` adds the repository root to Python's import path so the `backend.*` package imports also resolve when Render runs from this directory.
 - **Frontend (Vercel):** root directory `frontend`, build command `npm run build`, output directory `dist`. Set the environment variable `VITE_API_BASE_URL` to the backend's URL (no trailing slash).
 - The backend only accepts browser requests from the origins listed in `main.py`. If you deploy the frontend to a new domain, add it there.
 - On Render's free plan the backend sleeps when idle, so the first request after a break can take up to a minute. The frontend retains each station's last successful response in browser storage, considers it fresh for five minutes, and displays it while refreshing; older data is identified as earlier data.
