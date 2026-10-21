@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Leaf, RefreshCw } from 'lucide-react'
-import type { ActiveTab, WeatherState } from '../types'
+import { Leaf, MapPin, RefreshCw } from 'lucide-react'
+import type { ActiveTab, Station, WeatherState } from '../types'
 import {
   getWeatherDataFreshness,
   WEATHER_CACHE_TTL_MS,
@@ -10,6 +10,7 @@ import { NavigationTabs } from './NavigationTabs'
 interface NavbarProps {
   activeTab: ActiveTab
   onTabChange: (tab: ActiveTab) => void
+  selectedStation: Station
   weatherState: WeatherState
   onRetry: () => void
 }
@@ -26,7 +27,13 @@ function formatLastSuccess(lastFetched: string | null) {
   })
 }
 
-export function Navbar({ activeTab, onTabChange, weatherState, onRetry }: NavbarProps) {
+export function Navbar({
+  activeTab,
+  onTabChange,
+  selectedStation,
+  weatherState,
+  onRetry,
+}: NavbarProps) {
   const { data, error, isLoading, lastFetched } = weatherState
   const [, setFreshnessCheck] = useState(0)
   const isStale = getWeatherDataFreshness(lastFetched)
@@ -67,26 +74,39 @@ export function Navbar({ activeTab, onTabChange, weatherState, onRetry }: Navbar
           <span className="site-header__tagline">Heatwave &amp; Thermal Risk Insights</span>
         </span>
       </a>
-      <div className="site-header__status flex items-center gap-2 min-w-0">
-          <div className="min-w-0 text-xs text-forest-text" role="status" aria-live="polite">
-            <span className={`mr-2 inline-block h-2 w-2 rounded-full ${statusDot}`} aria-hidden="true" />
-            <span>{status}</span>
-          </div>
-          {error && !isLoading && (
-            <button
-              onClick={onRetry}
-              type="button"
-              className="text-sm font-medium text-forest-text hover:text-accent-light underline underline-offset-2 shrink-0"
-            >
-              Retry
-            </button>
-          )}
-          {isLoading && (
-            <RefreshCw
-              className="w-4 h-4 text-forest-text animate-spin shrink-0"
-              aria-hidden="true"
-            />
-          )}
+      <div className="site-header__station" role="group" aria-label="Selected station information">
+        <MapPin className="site-header__station-icon" aria-hidden="true" />
+        <span className="site-header__station-name">{selectedStation.name}</span>
+        <span className="site-header__station-detail" aria-label="Elevation">
+          {selectedStation.elevationM} m elevation
+        </span>
+        <span className="site-header__station-detail site-header__station-coordinate" aria-label="Coordinates">
+          {selectedStation.latitude.toFixed(4)}, {selectedStation.longitude.toFixed(4)}
+        </span>
+        <span className="site-header__station-region" aria-label="Region">
+          Region: {selectedStation.zone}
+        </span>
+      </div>
+      <div className="site-header__status flex min-w-0 items-center gap-2">
+        <div className="min-w-0 text-xs text-forest-text" role="status" aria-live="polite">
+          <span className={`mr-2 inline-block h-2 w-2 rounded-full ${statusDot}`} aria-hidden="true" />
+          <span>{status}</span>
+        </div>
+        {error && !isLoading && (
+          <button
+            onClick={onRetry}
+            type="button"
+            className="shrink-0 text-sm font-medium text-forest-text underline underline-offset-2 hover:text-accent-light"
+          >
+            Retry
+          </button>
+        )}
+        {isLoading && (
+          <RefreshCw
+            className="h-4 w-4 shrink-0 animate-spin text-forest-text"
+            aria-hidden="true"
+          />
+        )}
       </div>
       <NavigationTabs activeTab={activeTab} onTabChange={onTabChange} />
     </header>
