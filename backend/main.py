@@ -5,16 +5,24 @@ College Research Project: India Localized Heatwave Early Warning & Thermal Stres
 
 import logging
 import math
+import sys
 import time
 from datetime import date, datetime, timezone
 from decimal import Decimal, ROUND_DOWN
 from email.utils import parsedate_to_datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# Render runs this module with the backend directory as its working directory.
+# Add the repository root so absolute ``backend.*`` imports resolve there too.
+REPOSITORY_ROOT = str(Path(__file__).resolve().parent.parent)
+if REPOSITORY_ROOT not in sys.path:
+    sys.path.insert(0, REPOSITORY_ROOT)
 
 from backend.routers.science import router as science_router
 from backend.science.thermal import (
