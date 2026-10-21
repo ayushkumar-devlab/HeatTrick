@@ -63,3 +63,9 @@ htmlcov/
 
 # TypeScript build cache
 *.tsbuildinfo
+
+# Local API inspection output
+/openapi.json
+
+# Local API inspection output
+/openapi.json
