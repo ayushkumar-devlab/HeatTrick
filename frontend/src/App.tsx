@@ -176,6 +176,7 @@ export default function App() {
           <MethodologyView
             selectedStation={selectedStation}
             currentTime={visibleWeatherState.data?.current.time}
+            weatherState={visibleWeatherState}
           />
         )}
       </main>

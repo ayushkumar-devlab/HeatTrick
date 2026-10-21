@@ -84,6 +84,7 @@ export function ForecastView({
         description="Daily highs and lows grouped by India local date."
         station={selectedStation}
         currentTime={weatherState.data?.current.time}
+        weatherState={weatherState}
       />
       <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-4">

@@ -56,6 +56,13 @@ const CATEGORY_LABELS: Record<HeatwaveCategory, string> = {
   severe_heatwave: 'Severe heatwave',
 }
 
+function isForecastDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const date = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(date.getTime())
+    && date.toISOString().slice(0, 10) === value
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -71,6 +78,7 @@ function validateDiagnosis(value: unknown): HeatwaveDiagnosis | null {
     if (
       !isRecord(item)
       || typeof item.date !== 'string'
+      || !isForecastDate(item.date)
       || typeof item.tmax !== 'number'
       || !Number.isFinite(item.tmax)
       || typeof item.normal !== 'number'
@@ -142,10 +150,16 @@ export function HeatwaveView({ selectedStation, weatherState }: HeatwaveViewProp
   const daily = weatherState.data?.daily
   const peak = forecastPeak(daily?.temperature_2m_max)
   const threshold = terrainThreshold(selectedStation.imdCriteriaType)
-  const diagnosisDays = (daily?.time ?? []).flatMap((date, index) => {
+  const forecastDays = (daily?.time ?? []).map((date, index) => {
     const tmax = daily?.temperature_2m_max[index]
-    return typeof tmax === 'number' && Number.isFinite(tmax) ? [{ date, tmax_c: tmax }] : []
+    return {
+      date,
+      tmax: typeof tmax === 'number' && Number.isFinite(tmax) ? tmax : null,
+    }
   })
+  const diagnosisDays = forecastDays.flatMap(({ date, tmax }) =>
+    isForecastDate(date) && tmax != null ? [{ date, tmax_c: tmax }] : [],
+  )
   const requestBody = JSON.stringify({
     station_id: selectedStation.id,
     days: diagnosisDays,
@@ -153,6 +167,16 @@ export function HeatwaveView({ selectedStation, weatherState }: HeatwaveViewProp
   const [diagnosis, setDiagnosis] = useState<HeatwaveDiagnosis | null>(null)
   const [diagnosisLoading, setDiagnosisLoading] = useState(false)
   const [diagnosisError, setDiagnosisError] = useState<string | null>(null)
+  const diagnosisByDate = new Map(
+    (diagnosis?.days ?? []).map((day) => [day.date, day]),
+  )
+  const thresholdDays = (diagnosis?.days ?? []).filter(
+    (day) => day.category !== 'no_heatwave',
+  )
+  const hasCompleteDiagnosis = forecastDays.length > 0
+    && forecastDays.every(({ date, tmax }) =>
+      isForecastDate(date) && tmax != null && diagnosisByDate.has(date),
+    )
 
   useEffect(() => {
     if (!weatherState.data || diagnosisDays.length === 0) {
@@ -203,9 +227,10 @@ export function HeatwaveView({ selectedStation, weatherState }: HeatwaveViewProp
     <div className="space-y-6">
       <ViewBanner
         title="Heatwave analysis"
-        description="Basic forecast comparisons against the selected terrain’s IMD temperature thresholds."
+        description="Model-diagnostic comparisons against IMD temperature thresholds; not an official warning."
         station={selectedStation}
         currentTime={weatherState.data?.current.time}
+        weatherState={weatherState}
       />
       <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-7">
         <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Forecast threshold comparison</h3>
@@ -217,48 +242,96 @@ export function HeatwaveView({ selectedStation, weatherState }: HeatwaveViewProp
           </p>
         ) : diagnosisLoading ? (
           <p className="mt-3 text-sm text-muted" role="status">Checking forecast days against climatological normals…</p>
-        ) : diagnosisError ? (
-          <p className="mt-3 rounded-lg border border-danger-border bg-danger-soft p-3 text-sm text-danger" role="alert">
-            Heatwave diagnosis is unavailable: {diagnosisError}
-          </p>
-        ) : diagnosis ? (
+        ) : (
           <div className="mt-4 space-y-4">
-            {diagnosis.result.flagged ? (
+            {diagnosisError ? (
+              <p className="rounded-lg border border-danger-border bg-danger-soft p-3 text-sm text-danger" role="alert">
+                Forecast classifications could not be calculated: {diagnosisError}
+              </p>
+            ) : diagnosis?.result.flagged ? (
               <div className="rounded-lg border border-accent/40 bg-warning-soft p-3 text-sm leading-6 text-warning-ink">
-                Heatwave criteria met in the diagnostic forecast window.
+                IMD temperature thresholds met across a qualifying consecutive period in this diagnostic forecast window.
                 {diagnosis.result.qualifying_periods.map((period) => (
                   <p key={`${period.start}-${period.end}`} className="mt-1">
                     {period.category.replaceAll('_', ' ')}: {period.start} to {period.end} ({period.days} days)
                   </p>
                 ))}
+                {!hasCompleteDiagnosis && (
+                  <p className="mt-1">
+                    Some forecast dates could not be assessed; other dates may have additional threshold results.
+                  </p>
+                )}
               </div>
+            ) : diagnosis && thresholdDays.length > 0 ? (
+              <div className="rounded-lg border border-accent/40 bg-warning-soft p-3 text-sm leading-6 text-warning-ink">
+                IMD temperature thresholds met on one or more forecast days, but no qualifying consecutive period was identified.
+                {thresholdDays.map((day) => (
+                  <p key={day.date} className="mt-1">
+                    {day.date}: {CATEGORY_LABELS[day.category]}
+                  </p>
+                ))}
+                {!hasCompleteDiagnosis && (
+                  <p className="mt-1">
+                    Some forecast dates could not be assessed; other dates may have additional threshold results.
+                  </p>
+                )}
+              </div>
+            ) : diagnosis && hasCompleteDiagnosis ? (
+              <p className="rounded-lg border border-border bg-surface-alt p-3 text-sm leading-6 text-ink-soft" role="status">
+                No IMD temperature thresholds met in the forecast window.
+              </p>
             ) : (
               <p className="rounded-lg border border-border bg-surface-alt p-3 text-sm leading-6 text-ink-soft" role="status">
-                No heatwave criteria met in the forecast window (diagnostic)
+                Insufficient data to assess every forecast day; no conclusion can be drawn for the full window.
               </p>
             )}
+            <p className="text-sm leading-6 text-ink-soft">
+              Based on the available forecast maximum temperatures and climatological normals. This is a model diagnostic, not an official IMD warning.
+            </p>
+            <p className="text-sm leading-6 text-warning-ink">
+              Heat-related health risks may still occur when official heatwave thresholds are not met.
+            </p>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[38rem] border-collapse text-left text-sm">
-                <thead>
+              <table className="w-full min-w-[52rem] border-collapse text-left text-sm">
+                <caption className="sr-only">Forecast daily maximum temperature comparison with terrain thresholds and climatological normals</caption>
+                <thead className="bg-surface-alt">
                   <tr className="border-b border-border text-muted">
-                    <th className="p-3 font-medium">Date</th>
-                    <th className="p-3 font-medium">Tmax</th>
-                    <th className="p-3 font-medium">Normal</th>
-                    <th className="p-3 font-medium">Departure</th>
-                    <th className="p-3 font-medium">Category / criteria</th>
+                    <th scope="col" className="p-3 font-medium">Date</th>
+                    <th scope="col" className="p-3 font-medium">Forecast maximum</th>
+                    <th scope="col" className="p-3 font-medium">Tmax threshold</th>
+                    <th scope="col" className="p-3 font-medium">Normal</th>
+                    <th scope="col" className="p-3 font-medium">Departure</th>
+                    <th scope="col" className="p-3 font-medium">Classification / status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border text-ink-soft">
-                  {diagnosis.days.map((day) => (
-                    <tr key={day.date}>
-                      <td className="p-3 tabular-nums">{day.date}</td>
-                      <td className="p-3 tabular-nums">{day.tmax.toFixed(1)} °C</td>
-                      <td className="p-3 tabular-nums">{day.normal.toFixed(1)} °C</td>
-                      <td className="p-3 tabular-nums">{day.departure.toFixed(1)} °C</td>
+                  {forecastDays.map(({ date, tmax }) => {
+                    const day = diagnosisByDate.get(date)
+                    const status = day && tmax != null
+                      ? day.category === 'no_heatwave' ? 'Threshold not met' : 'Threshold met'
+                      : 'Insufficient data'
+                    return (
+                    <tr key={date} className="odd:bg-surface even:bg-surface-alt/50">
+                      <th scope="row" className="whitespace-nowrap p-3 font-medium tabular-nums text-ink">{date}</th>
+                      <td className="whitespace-nowrap p-3 tabular-nums">{tmax == null ? '—' : `${tmax.toFixed(1)} °C`}</td>
+                      <td className="whitespace-nowrap p-3 tabular-nums">
+                        ≥ {threshold} °C
+                        <span className="block text-xs text-muted">
+                          Departure: ≥ +4.5 °C; severe: &gt; +6.4 °C
+                        </span>
+                        {ABSOLUTE_THRESHOLDS[selectedStation.imdCriteriaType] != null && (
+                          <span className="block text-xs text-muted">
+                            Absolute: ≥ {ABSOLUTE_THRESHOLDS[selectedStation.imdCriteriaType]} °C
+                          </span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap p-3 tabular-nums">{day ? `${day.normal.toFixed(1)} °C` : '—'}</td>
+                      <td className="whitespace-nowrap p-3 tabular-nums">{day ? `${day.departure.toFixed(1)} °C` : '—'}</td>
                       <td className="p-3">
-                        <span className="font-medium text-ink">{CATEGORY_LABELS[day.category]}</span>
-                        {day.criterion.length > 0 && (
-                          <ul className="mt-1 list-disc pl-5">
+                        <span className="font-medium text-ink">{day ? CATEGORY_LABELS[day.category] : 'Not assessed'}</span>
+                        <span className="mt-1 block text-sm">{status}</span>
+                        {day && day.criterion.length > 0 && (
+                          <ul className="mt-1 list-disc pl-5 text-xs leading-5">
                             {day.criterion.map((criterion) => (
                               <li key={criterion}>{CRITERION_LABELS[criterion] ?? criterion}</li>
                             ))}
@@ -266,17 +339,19 @@ export function HeatwaveView({ selectedStation, weatherState }: HeatwaveViewProp
                         )}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
+                  {forecastDays.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-4 text-center text-ink-soft">
+                        Insufficient data: no forecast dates and maximum temperatures are available.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
-        ) : !weatherState.data || diagnosisDays.length === 0 ? (
-          <p className="mt-3 rounded-lg border border-border bg-surface-alt p-3 text-sm text-ink-soft" role="status">
-            Forecast daily maximum temperatures are unavailable for diagnosis.
-          </p>
-        ) : (
-          null
         )}
       </section>
 

@@ -42,7 +42,7 @@ export function Navbar({ activeTab, onTabChange, weatherState, onRetry }: Navbar
   }, [lastFetched])
 
   const status = isLoading
-    ? data && isStale
+    ? data
       ? `Updating · earlier data · ${formatLastSuccess(lastFetched)}`
       : 'Updating'
     : error && data
@@ -52,7 +52,7 @@ export function Navbar({ activeTab, onTabChange, weatherState, onRetry }: Navbar
         : data
         ? isStale
           ? `Earlier data · ${formatLastSuccess(lastFetched)}`
-          : `Live · updated ${formatLastSuccess(lastFetched)}`
+          : `Forecast · updated ${formatLastSuccess(lastFetched)}`
           : 'Unavailable'
   const statusDot = error || (isStale && data)
     ? data ? 'bg-status-amber' : 'bg-status-red'

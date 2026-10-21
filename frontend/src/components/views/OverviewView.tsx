@@ -10,6 +10,7 @@ import { heatwaveVerdict } from '../../lib/heatwave'
 import { formatChartDate } from '../../lib/chartLabels'
 import { heatBandInk } from '../../lib/temperatureBands'
 import { calculateHeatIndexCelsius } from '../../utils/heatIndex'
+import { WeatherProvenance } from '../WeatherProvenance'
 
 interface OverviewViewProps {
   selectedStation: Station
@@ -38,15 +39,14 @@ function localDate(timestamp: string | undefined) {
   return year && month && day ? `${year}-${month}-${day}` : null
 }
 
-function formatAsOf(timestamp: string | undefined) {
+function formatForecastTime(timestamp: string | undefined) {
   if (!timestamp) return null
   const date = new Date(timestamp)
   if (Number.isNaN(date.getTime())) return null
-  return date.toLocaleTimeString('en-IN', {
+  return date.toLocaleString('en-IN', {
     timeZone: LOCATION_TIME_ZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
+    dateStyle: 'medium',
+    timeStyle: 'short',
   })
 }
 
@@ -125,7 +125,7 @@ export function OverviewView({
               </p>
               <p className="mt-3 inline-flex items-center gap-1.5 text-sm text-ink-soft">
                 <Clock3 className="h-4 w-4" aria-hidden="true" />
-                As of {formatAsOf(current?.time) ?? '—'}
+                Forecast valid at {formatForecastTime(current?.time) ?? '—'}
               </p>
             </div>
             <div className="border-t border-border/80 pt-4 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
@@ -143,6 +143,10 @@ export function OverviewView({
           </div>
         </div>
       </section>
+
+      <WeatherProvenance
+        weatherState={weatherState}
+      />
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(17rem,1fr)]">
         <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6">
@@ -184,7 +188,7 @@ export function OverviewView({
           )}
         </section>
 
-        <KeyValueList rows={rows} title="Right now" />
+        <KeyValueList rows={rows} title="Current forecast values" />
       </div>
 
       {weatherState.error && weatherState.data && (

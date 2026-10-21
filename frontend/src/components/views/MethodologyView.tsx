@@ -1,4 +1,4 @@
-import type { Station } from '../../types'
+import type { Station, WeatherState } from '../../types'
 import { methods } from '../../data/methods'
 import { getHeroPhotoCredits } from '../../lib/heroPhotoCredits'
 import { ViewBanner } from '../ViewBanner'
@@ -6,9 +6,14 @@ import { ViewBanner } from '../ViewBanner'
 interface MethodologyViewProps {
   selectedStation: Station
   currentTime?: string
+  weatherState: WeatherState
 }
 
-export function MethodologyView({ selectedStation, currentTime }: MethodologyViewProps) {
+export function MethodologyView({
+  selectedStation,
+  currentTime,
+  weatherState,
+}: MethodologyViewProps) {
   const photoCredits = getHeroPhotoCredits()
 
   return (
@@ -18,6 +23,7 @@ export function MethodologyView({ selectedStation, currentTime }: MethodologyVie
         description="Data sources, implemented calculations, and limitations."
         station={selectedStation}
         currentTime={currentTime}
+        weatherState={weatherState}
       />
 
       <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6">
