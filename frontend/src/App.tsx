@@ -121,6 +121,7 @@ export default function App() {
       <Navbar
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        selectedStation={selectedStation}
         weatherState={visibleWeatherState}
         onRetry={handleRefreshWeather}
       />
