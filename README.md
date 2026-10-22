@@ -237,7 +237,7 @@ How far these go depends on data availability, validation and the scope of futur
 
 ## Credits and licence
 
-HeatTrick was built by **Ayush Kumar**, an Electronics and Communication Engineering undergraduate at RV Institute of Technology and Management, Bengaluru, as a research and learning project.
+HeatTrick was built by **Ayush Kumar**, an Electronics and Communication Engineering undergrad at RV Institute of Technology and Management, Bengaluru, as a research and learning project.
 
 Weather data is provided by **MET Norway** through its Locationforecast API and used under **CC BY 4.0**. Please consult the data and source documentation for the applicable terms.
 
