@@ -1,92 +1,174 @@
-# HeatTrick
+# 🌡️ HeatTrick
 
 **Localized heat, clearly explained.**
 
-HeatTrick is a small web app that shows the weather forecast for locations across India and puts it in the context of heat risk. For a chosen station, it tells you in plain language how the forecast high compares with the temperatures India's weather department (IMD) uses to define a heatwave, and how humid air can make the heat harder on the body.
+A heatwave doesn't hit every place the same way. Temperature is only half the story: add humidity, and the same 38 °C can feel very different on your body.
 
-It started as a college research project on localized heatwave early warning and human thermal stress in India. It is still a prototype, and it is **not** an official warning service. For real advisories, follow [IMD](https://mausam.imd.gov.in/) and [NDMA](https://ndma.gov.in/).
+HeatTrick is a research-oriented web app that helps you make sense of a local weather forecast in the context of heatwave thresholds and human thermal stress. It puts forecast data, heatwave criteria and thermal calculations in one place, and, more importantly, tries to explain what the numbers actually mean.
 
-**Live site:** https://heat-trick.vercel.app/
+🌐 **Try it live:** [heat-trick.vercel.app](https://heat-trick.vercel.app/)
 
-## What it does today
+> **A quick note:** HeatTrick is a research and learning prototype, not an official weather-warning service. For official forecasts and heatwave advisories, please check the [India Meteorological Department (IMD)](https://mausam.imd.gov.in/) and the [National Disaster Management Authority (NDMA)](https://ndma.gov.in/).
 
-- **Overview:** a plain-language headline such as "Forecast high of 33.4 °C is 6.6 °C below the 40 °C line IMD uses for heatwaves on the plains", the current temperature, today's high and low, and a 7-day chart of daily highs.
-- **Heatwave Analysis:** compares the forecast high with the base thresholds for plains, coastal and hilly stations (40 °C, 37 °C and 30 °C). It is a basic threshold check, not an official classification.
-- **Thermal Stress:** computes the NOAA Heat Index, Stull wet-bulb temperature and a shade/no-radiation WBGT estimate from air temperature and humidity, plus a dew point derived from the same two values. The WBGT is explicitly an estimate, not a measurement; values are shown only when the inputs are valid.
-- **Forecast:** the full 7-day outlook with daily highs and lows.
-- **Methods & sources:** how everything is calculated, where the data comes from, and what the app cannot do.
+---
 
-Pick a station from the selector and every page updates. If the weather service can't be reached, the app says so, shows the last data it had, and lets you retry. It never fills the gap with made-up numbers.
+## Why I built this
 
-## What it doesn't do (yet)
+I started HeatTrick while exploring localized heatwave early warning and human thermal stress in India. I didn't want to just show a temperature and call it a day. I wanted to build something that helps people understand why a number matters.
 
-Being honest about this matters more than looking impressive:
+The idea is simple:
 
-- It does not issue heatwave warnings or alerts.
-- It does not know a station's climatological normal, so IMD's "departure from normal" rule can't be applied. The app says when a heatwave "can't be confirmed" for that reason.
-- A measured or solar-radiation-based WBGT is not computed because the weather source doesn't provide solar radiation. Thermal Stress shows only an explicitly labelled shade/no-radiation WBGT estimate.
-- There is no machine learning, vulnerability mapping or mortality modelling.
+1. Show the forecast.
+2. Compare it with the relevant heatwave temperature threshold.
+3. Estimate how temperature and humidity together affect thermal comfort.
+4. Be upfront about what the estimates can't tell you, instead of passing them off as facts.
 
-## Where the data comes from
+This is an early step. Right now it's a working weather app with transparent, rule-based calculations, and the more ambitious research features are still ahead of me.
 
-Weather data comes from the [MET Norway Locationforecast API](https://api.met.no/weatherapi/locationforecast/2.0/documentation), used under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and adapted by HeatTrick.
+---
 
-Some things worth knowing:
+## What you can explore
 
-- The values are **model forecasts for a grid point**, not readings from a weather station.
-- Daily highs and lows are taken from discrete forecast steps (hourly early on, every 6 hours later in the week), so they can understate the true peak a little.
-- Days are grouped by India local date (Asia/Kolkata). The first and last days can be partial.
+### 1. Overview
+A quick snapshot of the selected location: current temperature, forecast high and low, and a seven-day temperature chart. It also puts the forecast high in context, for example by showing how far it sits above or below the relevant IMD heatwave threshold.
+
+### 2. Heatwave Analysis
+Compare the forecast high against baseline heatwave thresholds for different terrain types:
+
+| Region  | Threshold |
+| ------- | --------- |
+| Plains  | 40 °C     |
+| Coastal | 37 °C     |
+| Hilly   | 30 °C     |
+
+This is a basic threshold comparison, **not** an official heatwave classification. IMD's assessment also looks at the departure from the climatological normal, which this version doesn't calculate yet.
+
+### 3. Thermal Stress
+Air temperature and relative humidity are used to calculate or estimate:
+
+- **NOAA Heat Index**: roughly how hot it may *feel* once humidity is factored in.
+- **Wet-bulb temperature**: calculated with the Stull approximation.
+- **WBGT estimate**: a shade / no-radiation estimate of Wet-Bulb Globe Temperature.
+- **Dew point**: derived from temperature and relative humidity.
+
+These are meant for exploring conditions, not for replacing professional heat-stress measurement or medical advice. The WBGT value is an estimate, not a measurement, and it doesn't account for real solar radiation.
+
+### 4. Seven-day Forecast
+Daily highs and lows for the coming week, so you can see how conditions are likely to change rather than just how they look right now.
+
+### 5. Methods & Sources
+Where the data comes from, how each indicator is calculated, and what the current model can and can't establish. I think this page matters most: a good research tool should explain its assumptions and limits, not just show polished charts.
+
+---
+
+## How the weather data works
+
+HeatTrick pulls forecasts from the [MET Norway Locationforecast API](https://api.met.no/weatherapi/locationforecast/2.0/documentation), used under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) with attribution to MET Norway.
+
+A few things worth knowing when you read the results:
+
+- **Forecasts are not observations.** The data comes from a model grid point near your chosen location, not necessarily from a physical weather station.
+- **Daily extremes are approximations.** Highs and lows are derived from the available forecast steps. Later in the week those steps get wider apart, so some peaks and dips can be missed.
+- **Days follow Indian Standard Time.** Forecast days are grouped using `Asia/Kolkata`, so the first and last days of an outlook may be partial.
+- **Missing data stays missing.** If the source doesn't provide a value, HeatTrick shows it as unavailable. It never invents a number or quietly shows zero.
+
+If the weather service goes down, the app tells you, can show previously cached data (clearly marked as older), and gives you a way to retry.
+
+---
+
+## What HeatTrick can't do (yet)
+
+These limits are deliberate, and it's important to understand them before relying on any result.
+
+- ❌ It doesn't issue official heatwave warnings, public alerts or emergency notifications.
+- ❌ It doesn't calculate location-specific climatological normals, so IMD's departure-from-normal criterion isn't applied.
+- ❌ It doesn't compute a solar-radiation-based WBGT. The displayed value is a shade / no-radiation estimate.
+- ❌ It has no machine-learning heatwave prediction, spatial vulnerability modelling or mortality-risk modelling.
+- ❌ It doesn't replace official meteorological data, professional thermal-stress assessment or public-health guidance.
+
+These are areas for future work, not features I'm claiming today.
+
+---
 
 ## Tech stack
 
-| Part | Tools |
-|---|---|
-| Frontend | React, TypeScript, Vite, Tailwind CSS, Lucide icons (charts are hand-written SVG) |
-| Backend | Python 3.10, FastAPI, Uvicorn, Pydantic, httpx |
-| Hosting | Vercel (frontend), Render (backend) |
+| Layer            | Technologies                                        |
+| ---------------- | --------------------------------------------------- |
+| Frontend         | React, TypeScript, Vite, Tailwind CSS, Lucide icons |
+| Charts           | Custom SVG visualisations                           |
+| Backend          | Python 3.10+, FastAPI, Uvicorn, Pydantic, httpx     |
+| Weather data     | MET Norway Locationforecast API                     |
+| Frontend hosting | Vercel                                              |
+| Backend hosting  | Render                                              |
+| Testing          | Pytest, TypeScript and production build checks      |
 
-## Project layout
+## Project structure
 
-```
+```text
 HeatTrick/
-├── backend/            FastAPI service (main.py) and tests
+├── backend/
 │   ├── main.py
 │   ├── requirements.txt
 │   └── tests/
-└── frontend/           React app
+└── frontend/
+    ├── package.json
     └── src/
-        ├── components/ pages, charts, layout
-        ├── lib/        heatwave rules, dew point, forecast helpers
-        ├── utils/      Heat Index
-        ├── data/       reference stations
-        └── services/   API client
+        ├── components/
+        ├── lib/
+        ├── utils/
+        ├── data/
+        └── services/
 ```
 
-## API
+The backend handles API requests and weather-data processing. The frontend takes care of the interface, visualisations and calculations you see.
 
-| Endpoint | What it returns |
-|---|---|
-| `GET /api/health` | `{"status": "ok", "app": "HeatTrick"}` |
-| `GET /api/weather?latitude=..&longitude=..` | Current conditions, 7-day daily highs and lows, units and source metadata |
-| `GET /api/thermal?temp_c=..&rh=..` | NOAA Heat Index, Stull wet-bulb result, and an explicitly labelled shade/no-radiation WBGT estimate, with calculation methods and limitations |
+## API endpoints
 
-Fields the source doesn't provide come back as `null`, and the frontend shows them as missing, never as zero. Responses are cached on the server according to MET Norway's cache headers.
+| Endpoint                                      | What it does                                                             |
+| --------------------------------------------- | ------------------------------------------------------------------------ |
+| `GET /api/health`                             | Checks that the backend is running                                       |
+| `GET /api/weather?latitude=...&longitude=...` | Returns conditions, forecast highs and lows, and source metadata         |
+| `GET /api/thermal?temp_c=...&rh=...`          | Returns thermal indicators, calculation methods and relevant limitations |
+
+A healthy `/api/health` response looks like this:
+
+```json
+{
+  "status": "ok",
+  "app": "HeatTrick"
+}
+```
+
+The weather service respects the source's caching information where applicable, and both frontend and backend handle unavailable data so missing values are never passed off as real measurements.
+
+---
 
 ## Run it locally
 
-You need Python 3.10+ and Node.js 18+.
+You'll need **Python 3.10+** and **Node.js**.
 
-**1. Backend**
+### 1. Clone the repo
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
-python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+git clone https://github.com/ayushkumar-devlab/HeatTrick.git
+cd HeatTrick
 ```
 
-Run these commands from the repository root. The backend listens on http://127.0.0.1:8000, with interactive docs at `/docs`. Keep this terminal open.
+### 2. Start the backend
 
-**2. Frontend** (in a second terminal)
+From the repository root:
+
+```powershell
+python -m venv backend\venv
+.\backend\venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+.\backend\venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+```
+
+Leave this terminal open. The API will be at `http://127.0.0.1:8000`, with interactive docs at `http://127.0.0.1:8000/docs`.
+
+### 3. Start the frontend
+
+In a second terminal, from the repository root:
 
 ```powershell
 cd frontend
@@ -94,33 +176,73 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-Open http://localhost:5173. In development, Vite forwards `/api` calls to the backend on port 8000, so you don't need any configuration.
+Open the address Vite prints, usually `http://localhost:5173`. In development, Vite forwards `/api` requests to the backend on port 8000, so keep both running while you test.
 
-**Tests and checks**
+### 4. Run the checks
+
+Backend tests, from the repository root:
 
 ```powershell
-cd backend;  .\venv\Scripts\python.exe -m pytest
-cd frontend; npm.cmd run build; npm.cmd run lint
+.\backend\venv\Scripts\python.exe -m pytest backend\tests
 ```
+
+Frontend build and lint:
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run lint
+```
+
+A successful build means the frontend compiles, but do glance over any lint warnings or errors separately.
+
+---
 
 ## Deployment
 
-- **Backend (Render):** root directory `backend`, build command `pip install -r requirements.txt`, start command `uvicorn main:app --host 0.0.0.0 --port $PORT`. `main.py` adds the repository root to Python's import path so the `backend.*` package imports also resolve when Render runs from this directory.
-- **Frontend (Vercel):** root directory `frontend`, build command `npm run build`, output directory `dist`. Set the environment variable `VITE_API_BASE_URL` to the backend's URL (no trailing slash).
-- The backend only accepts browser requests from the origins listed in `main.py`. If you deploy the frontend to a new domain, add it there.
-- On Render's free plan the backend sleeps when idle, so the first request after a break can take up to a minute. The frontend retains each station's last successful response in browser storage, considers it fresh for five minutes, and displays it while refreshing; older data is identified as earlier data.
+The frontend and backend are deployed separately.
 
-## Roadmap
+### Backend on Render
 
-- Load climatological normals so IMD's departure-from-normal rule can be applied.
-- Add WBGT once a source with solar radiation is available.
-- Compare forecasts with observations to see how well the thresholds hold up.
-- More stations, and a way to search for any location.
+- **Root directory:** `backend`
+- **Build command:** `pip install -r requirements.txt`
+- **Start command:** `uvicorn main:app --host 0.0.0.0 --port $PORT`
+
+### Frontend on Vercel
+
+- **Root directory:** `frontend`
+- **Build command:** `npm run build`
+- **Output directory:** `dist`
+- **Environment variable:** `VITE_API_BASE_URL`, set to your deployed backend URL, with no trailing slash.
+
+The backend only accepts browser requests from configured origins, so if you deploy the frontend to a new domain, add that origin to the backend configuration.
+
+> **Heads-up:** On Render's free tier, the backend can be slow to respond after sitting idle. While a fresh request is in flight, HeatTrick may show previously retrieved data, labelled as older.
+
+---
+
+## What's next
+
+HeatTrick is still evolving. Here's what I'd like to tackle:
+
+- Add reliable climatological normals so IMD's heatwave criteria can be implemented more fully.
+- Bring in solar-radiation data for a more complete WBGT calculation.
+- Compare forecasts against observed weather to see how accurate threshold-based results really are.
+- Cover more locations and make it easier to search beyond the predefined stations.
+- Explore spatial vulnerability assessment and more advanced heat-risk modelling.
+
+How far these go depends on data availability, validation and the scope of future development.
+
+---
 
 ## Credits and licence
 
-Built by Ayush Kumar, ECE undergraduate at RV Institute of Technology and Management, Bengaluru, as a research and learning project.
+HeatTrick was built by **Ayush Kumar**, an Electronics and Communication Engineering undergraduate at RV Institute of Technology and Management, Bengaluru, as a research and learning project.
 
-Weather data: © MET Norway, CC BY 4.0.
+Weather data is provided by **MET Norway** through its Locationforecast API and used under **CC BY 4.0**. Please consult the data and source documentation for the applicable terms.
 
-Code released under the [MIT License](LICENSE).
+The code is released under the [MIT License](LICENSE).
+
+---
+
+*HeatTrick is a work in progress. The goal isn't just to show how hot a place might get, but to make the available information easier to understand, while staying honest about uncertainty and limitations.*
