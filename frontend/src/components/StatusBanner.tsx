@@ -21,7 +21,7 @@ export function StatusBanner({ weatherState, selectedStation }: StatusBannerProp
 
   let status: string
   if (!weatherState.data && weatherState.isLoading) {
-    status = 'Loading forecast data; diagnostic status is not yet available.'
+    status = 'The weather service may take a little time to wake up; diagnostic status will appear with the forecast.'
   } else if (!weatherState.data && weatherState.error) {
     status = 'Forecast data could not be loaded; diagnostic status is unavailable.'
   } else if (forecastHigh == null) {

@@ -49,7 +49,7 @@ export function Navbar({
   const status = isLoading
     ? data
       ? `Updating · earlier data · ${formatLastSuccess(lastFetched)}`
-      : 'Updating'
+      : 'Waiting for weather service'
     : error && data
       ? `Earlier data · ${formatLastSuccess(lastFetched)}`
       : error

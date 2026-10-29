@@ -80,6 +80,13 @@ export function OverviewView({
   const temperature = current?.temperature_2m
   const dewPoint = dewPointFromTRh(temperature, current?.relative_humidity_2m)
   const heatIndex = calculateHeatIndexCelsius(temperature, current?.relative_humidity_2m)
+  const initialWeatherLoad = !weatherState.data && weatherState.isLoading
+  const weatherUnavailable = !weatherState.data && Boolean(weatherState.error)
+  const headline = initialWeatherLoad
+    ? 'Getting your local forecast…'
+    : weatherUnavailable
+      ? 'Weather data could not be loaded.'
+      : verdict.headline
   const rows = [
     { label: 'Humidity', value: current?.relative_humidity_2m, unit: '%' },
     {
@@ -101,13 +108,25 @@ export function OverviewView({
         />
         <div className="overview-hero__copy">
           <h2 className="display-title text-2xl font-semibold leading-tight text-ink sm:text-3xl">
-            {verdict.headline}
+            {headline}
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
-            This is a basic threshold comparison, not an official IMD classification.
-          </p>
-          {verdict.subline !== 'This is a basic threshold comparison, not an official IMD classification.' && (
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">{verdict.subline}</p>
+          {initialWeatherLoad ? (
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft" role="status">
+              The weather service may take a little time to wake up after inactivity. Your forecast will appear as soon as it responds.
+            </p>
+          ) : weatherUnavailable ? (
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-danger" role="alert">
+              {weatherState.error} Use Retry in the header to try again.
+            </p>
+          ) : (
+            <>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
+                This is a basic threshold comparison, not an official IMD classification.
+              </p>
+              {verdict.subline !== 'This is a basic threshold comparison, not an official IMD classification.' && (
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">{verdict.subline}</p>
+              )}
+            </>
           )}
 
           <div className="mt-6 grid gap-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] sm:items-end">
@@ -169,7 +188,7 @@ export function OverviewView({
               />
             </div>
           ) : weatherState.isLoading ? (
-            <p className="mt-4 text-sm text-muted" role="status">Loading forecast…</p>
+            <p className="mt-4 text-sm text-muted" role="status">Waiting for the weather service…</p>
           ) : weatherState.error ? (
             <p className="mt-4 rounded-lg border border-danger-border bg-danger-soft p-3 text-sm text-danger" role="status">
               Weather data is unavailable. Use Retry in the header to try again.
