@@ -27,7 +27,8 @@ export function WeatherProvenance({
   if (!data) return null
 
   const showingEarlierData = Boolean(
-    (fetchedAtTimestamp && getWeatherDataFreshness(fetchedAtTimestamp))
+    data.metadata.is_stale
+    || (fetchedAtTimestamp && getWeatherDataFreshness(fetchedAtTimestamp))
     || (isLoading && data)
     || (error && !isLoading),
   )

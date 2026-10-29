@@ -133,6 +133,24 @@ class CachedWeather:
 weather_cache: dict[tuple[float, float], CachedWeather] = {}
 
 
+def _stale_weather_fallback(
+    cache_key: tuple[float, float],
+) -> "WeatherResponse | None":
+    cached = weather_cache.get(cache_key)
+    now = time.monotonic()
+    if cached is None or not cached.expires_at <= now < cached.retain_until:
+        return None
+
+    logger.warning("Returning stale cached forecast after MET Norway failure.")
+    return cached.weather.model_copy(
+        update={
+            "metadata": cached.weather.metadata.model_copy(
+                update={"is_stale": True}
+            )
+        }
+    )
+
+
 def _cache_weather(
     cache_key: tuple[float, float],
     weather: "WeatherResponse",
@@ -210,6 +228,7 @@ class SourceMetadata(BaseModel):
     elevation: float | None = None
     timezone: str | None = None
     retrieved_at: str
+    is_stale: bool = False
 
 
 class WeatherResponse(BaseModel):
@@ -302,6 +321,9 @@ async def get_weather(
             )
     except httpx.TimeoutException as err:
         logger.warning("MET Norway request timed out: %s", err)
+        stale = _stale_weather_fallback(cache_key)
+        if stale is not None:
+            return stale
         raise HTTPException(
             status_code=504,
             detail="MET Norway did not respond before the request timed out.",
@@ -312,6 +334,9 @@ async def get_weather(
             type(err).__name__,
             err,
         )
+        stale = _stale_weather_fallback(cache_key)
+        if stale is not None:
+            return stale
         raise HTTPException(
             status_code=503,
             detail="Unable to connect to the MET Norway weather service.",
@@ -342,6 +367,9 @@ async def get_weather(
             response.status_code,
             _upstream_error_excerpt(response),
         )
+        stale = _stale_weather_fallback(cache_key)
+        if stale is not None:
+            return stale
         raise HTTPException(
             status_code=503,
             detail="MET Norway is temporarily rate-limited or unavailable.",
@@ -355,6 +383,9 @@ async def get_weather(
             err.response.status_code,
             _upstream_error_excerpt(err.response),
         )
+        stale = _stale_weather_fallback(cache_key)
+        if stale is not None:
+            return stale
         raise HTTPException(
             status_code=502,
             detail=f"MET Norway returned HTTP {err.response.status_code}.",
@@ -364,6 +395,9 @@ async def get_weather(
         payload = response.json()
     except ValueError:
         logger.warning("MET Norway returned invalid JSON.")
+        stale = _stale_weather_fallback(cache_key)
+        if stale is not None:
+            return stale
         raise HTTPException(
             status_code=502,
             detail="MET Norway returned invalid JSON.",
@@ -396,6 +430,9 @@ async def get_weather(
             )
     except (KeyError, TypeError, ValueError) as err:
         logger.warning("MET Norway returned an invalid forecast structure: %s", err)
+        stale = _stale_weather_fallback(cache_key)
+        if stale is not None:
+            return stale
         raise HTTPException(
             status_code=502,
             detail="Invalid forecast response received from MET Norway.",

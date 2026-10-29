@@ -34,7 +34,8 @@ export function Navbar({
 }: NavbarProps) {
   const { data, error, isLoading, lastFetched } = weatherState
   const [, setFreshnessCheck] = useState(0)
-  const isStale = getWeatherDataFreshness(lastFetched)
+  const isStale = Boolean(data?.metadata.is_stale)
+    || getWeatherDataFreshness(lastFetched)
 
   useEffect(() => {
     if (!lastFetched) return

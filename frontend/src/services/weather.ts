@@ -37,6 +37,8 @@ function isWeatherResponse(value: unknown): value is WeatherResponse {
     && daily.time.every((day) => typeof day === "string")
     && typeof value.metadata.latitude === "number"
     && typeof value.metadata.longitude === "number"
+    && (value.metadata.is_stale === undefined
+      || typeof value.metadata.is_stale === "boolean")
     && Object.values(value.units).every((unit) => typeof unit === "string");
 }
 

@@ -85,6 +85,27 @@ def _met_norway_payload():
     }
 
 
+def _cache_expired_weather():
+    main._cache_weather(
+        (28.5833, 77.2083),
+        main.WeatherResponse(
+            current=main.CurrentWeather(
+                time="2026-10-11T00:00:00Z",
+                temperature_2m=21.0,
+                relative_humidity_2m=62.0,
+            ),
+            daily=main.DailyForecast(time=["2026-10-11"]),
+            metadata=main.SourceMetadata(
+                latitude=28.5833,
+                longitude=77.2083,
+                retrieved_at="2026-10-11T00:00:00+00:00",
+            ),
+        ),
+        ttl=-1,
+        last_modified=None,
+    )
+
+
 def test_health_check():
     response = client.get("/api/health")
     assert response.status_code == 200
@@ -273,12 +294,108 @@ def test_weather_maps_met_norway_forecast(monkeypatch):
     assert data["metadata"]["longitude"] == 77.2083
     assert data["metadata"]["elevation"] == 216.0
     assert data["metadata"]["timezone"] == "Asia/Kolkata"
+    assert data["metadata"]["is_stale"] is False
 
     assert len(calls) == 1
     url, params, headers = calls[0]
     assert url == main.LOCATIONFORECAST_URL
     assert params == {"lat": 28.5833, "lon": 77.2083}
     assert headers["User-Agent"] == main.METNO_USER_AGENT
+
+
+def test_weather_returns_fresh_cached_forecast_without_upstream_call(monkeypatch):
+    calls = []
+
+    class MockMetNorwayClient:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            return None
+
+        async def get(self, url, params, headers):
+            calls.append(url)
+            return httpx.Response(
+                200,
+                json=_met_norway_payload(),
+                headers=_cache_headers(),
+                request=httpx.Request("GET", url),
+            )
+
+    monkeypatch.setattr(main.httpx, "AsyncClient", MockMetNorwayClient)
+    first = client.get(
+        "/api/weather?latitude=28.5833&longitude=77.2083"
+    )
+    second = client.get(
+        "/api/weather?latitude=28.5833&longitude=77.2083"
+    )
+
+    assert first.status_code == second.status_code == 200
+    assert second.json()["metadata"]["is_stale"] is False
+    assert len(calls) == 1
+
+
+def test_weather_returns_eligible_stale_cache_when_upstream_fails(monkeypatch):
+    class FailingMetNorwayClient:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            return None
+
+        async def get(self, url, params, headers):
+            return httpx.Response(503, text="temporary upstream failure")
+
+    monkeypatch.setattr(main.httpx, "AsyncClient", FailingMetNorwayClient)
+    cache_key = (28.5833, 77.2083)
+    _cache_expired_weather()
+
+    response = client.get(
+        "/api/weather?latitude=28.5833&longitude=77.2083"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["metadata"]["is_stale"] is True
+    assert (
+        response.json()["metadata"]["retrieved_at"]
+        == "2026-10-11T00:00:00+00:00"
+    )
+    assert main.weather_cache[cache_key].weather.metadata.is_stale is False
+
+
+def test_weather_uses_stale_cache_for_http_status_error(monkeypatch):
+    class NotFoundMetNorwayClient:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            return None
+
+        async def get(self, url, params, headers):
+            return httpx.Response(
+                404,
+                text="upstream not found",
+                request=httpx.Request("GET", url),
+            )
+
+    monkeypatch.setattr(main.httpx, "AsyncClient", NotFoundMetNorwayClient)
+    _cache_expired_weather()
+
+    response = client.get(
+        "/api/weather?latitude=28.5833&longitude=77.2083"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["metadata"]["is_stale"] is True
 
 
 def test_weather_truncates_coordinates_to_four_decimals(monkeypatch):
@@ -421,7 +538,63 @@ def test_weather_maps_upstream_timeout_to_504(monkeypatch, caplog):
     assert "provider timed out" in caplog.text
 
 
+def test_weather_returns_eligible_stale_cache_after_timeout(monkeypatch):
+    class TimeoutMetNorwayClient:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            return None
+
+        async def get(self, url, params, headers):
+            raise httpx.ReadTimeout("provider timed out")
+
+    monkeypatch.setattr(main.httpx, "AsyncClient", TimeoutMetNorwayClient)
+    _cache_expired_weather()
+
+    response = client.get(
+        "/api/weather?latitude=28.5833&longitude=77.2083"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["metadata"]["is_stale"] is True
+
+
 def test_weather_rejects_malformed_provider_response(monkeypatch, caplog):
+    class MalformedMetNorwayClient:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            return None
+
+        async def get(self, url, params, headers):
+            return httpx.Response(
+                200,
+                json={"properties": {"timeseries": []}},
+                request=httpx.Request("GET", url),
+            )
+    monkeypatch.setattr(main.httpx, "AsyncClient", MalformedMetNorwayClient)
+    _cache_expired_weather()
+
+    response = client.get(
+        "/api/weather?latitude=28.5833&longitude=77.2083"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["metadata"]["is_stale"] is True
+    assert "MET Norway returned an invalid forecast structure" in caplog.text
+
+
+def test_weather_preserves_malformed_structure_error_without_stale_cache(
+    monkeypatch,
+):
     class MalformedMetNorwayClient:
         def __init__(self, **kwargs):
             pass
@@ -449,4 +622,64 @@ def test_weather_rejects_malformed_provider_response(monkeypatch, caplog):
     assert response.json() == {
         "detail": "Invalid forecast response received from MET Norway."
     }
-    assert "MET Norway returned an invalid forecast structure" in caplog.text
+
+
+def test_weather_uses_stale_cache_for_malformed_provider_json(monkeypatch):
+    class MalformedJsonMetNorwayClient:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            return None
+
+        async def get(self, url, params, headers):
+            return httpx.Response(
+                200,
+                text="not valid JSON",
+                request=httpx.Request("GET", url),
+            )
+
+    monkeypatch.setattr(
+        main.httpx, "AsyncClient", MalformedJsonMetNorwayClient
+    )
+    _cache_expired_weather()
+
+    response = client.get(
+        "/api/weather?latitude=28.5833&longitude=77.2083"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["metadata"]["is_stale"] is True
+
+
+def test_weather_preserves_malformed_json_error_without_stale_cache(monkeypatch):
+    class MalformedJsonMetNorwayClient:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            return None
+
+        async def get(self, url, params, headers):
+            return httpx.Response(
+                200,
+                text="not valid JSON",
+                request=httpx.Request("GET", url),
+            )
+
+    monkeypatch.setattr(
+        main.httpx, "AsyncClient", MalformedJsonMetNorwayClient
+    )
+
+    response = client.get(
+        "/api/weather?latitude=28.5833&longitude=77.2083"
+    )
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "MET Norway returned invalid JSON."}

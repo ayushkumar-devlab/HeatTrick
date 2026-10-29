@@ -46,6 +46,7 @@ export interface WeatherMetadata {
   elevation: number | null
   timezone: string | null
   retrieved_at: string
+  is_stale?: boolean
 }
 
 export interface WeatherResponse {

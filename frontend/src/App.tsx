@@ -23,7 +23,9 @@ function createInitialWeatherState(): WeatherState {
     data: cached?.data ?? null,
     isLoading: true,
     error: null,
-    lastFetched: cached?.fetchedAt ?? null,
+    lastFetched: cached?.data.metadata.is_stale
+      ? cached.data.metadata.retrieved_at
+      : cached?.fetchedAt ?? null,
     stationId: DEFAULT_STATION.id,
   }
 }
@@ -50,7 +52,9 @@ export default function App() {
         data,
         isLoading: false,
         error: null,
-        lastFetched: new Date().toISOString(),
+        lastFetched: data.metadata.is_stale
+          ? data.metadata.retrieved_at
+          : new Date().toISOString(),
         stationId: station.id,
       })
     } catch (error: unknown) {
@@ -77,7 +81,9 @@ export default function App() {
         data: cached?.data ?? (sameStation ? previous.data : null),
         isLoading: true,
         error: null,
-        lastFetched: cached?.fetchedAt ?? (sameStation ? previous.lastFetched : null),
+        lastFetched: cached?.data.metadata.is_stale
+          ? cached.data.metadata.retrieved_at
+          : cached?.fetchedAt ?? (sameStation ? previous.lastFetched : null),
         stationId: station.id,
       }
     })
