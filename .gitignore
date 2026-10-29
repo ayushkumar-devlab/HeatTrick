@@ -66,6 +66,3 @@ htmlcov/
 
 # Local API inspection output
 /openapi.json
-
-# Local API inspection output
-/openapi.json
