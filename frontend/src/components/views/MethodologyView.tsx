@@ -27,8 +27,8 @@ export function MethodologyView({
       />
 
       <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6">
-        <h3 className="display-title font-semibold text-ink">Data sources</h3>
-        <div className="mt-3 space-y-3 text-sm leading-6 text-ink-soft">
+        <h3 className="display-title text-[1.375rem] font-semibold text-ink sm:text-[1.625rem]">Data sources</h3>
+        <div className="mt-3 space-y-3 text-base leading-7 text-ink-soft">
           <p>
             Current forecast data shown by the application is provided through the existing
             weather service. Forecast grid values are not direct observations at the named
@@ -70,7 +70,7 @@ export function MethodologyView({
       </section>
 
       <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6">
-        <h3 className="display-title font-semibold text-ink">Methods</h3>
+        <h3 className="display-title text-[1.375rem] font-semibold text-ink sm:text-[1.625rem]">Methods</h3>
         <div className="mt-4 space-y-4">
           {methods.map((method) => (
             <article key={method.id} className="rounded-xl border border-border bg-surface-alt p-4">
@@ -84,7 +84,7 @@ export function MethodologyView({
                   {method.status === 'planned' ? 'Planned' : 'Implemented'}
                 </span>
               </div>
-              <p className="mt-2 text-sm leading-6 text-ink-soft">{method.formula}</p>
+              <p className="mt-2 text-base leading-7 text-ink-soft">{method.formula}</p>
               <p className="mt-2 text-xs leading-5 text-muted">
                 Source: {method.source} Citation key: {method.citationKey}.
               </p>
@@ -94,8 +94,8 @@ export function MethodologyView({
       </section>
 
       <section className="rounded-2xl border border-accent/40 bg-warning-soft p-5 shadow-sm sm:p-6">
-        <h3 className="display-title font-semibold text-warning-ink">Limitations</h3>
-        <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-warning-ink">
+        <h3 className="display-title text-[1.375rem] font-semibold text-warning-ink sm:text-[1.625rem]">Limitations</h3>
+        <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7 text-warning-ink">
           {methods.flatMap((method) =>
             method.limitations.map((limitation) => (
               <li key={`${method.id}-${limitation}`}>{limitation}</li>
@@ -107,8 +107,8 @@ export function MethodologyView({
       </section>
 
       <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6">
-        <h3 className="display-title font-semibold text-ink">What this is not</h3>
-        <p className="mt-3 text-sm leading-6 text-ink-soft">
+        <h3 className="display-title text-[1.375rem] font-semibold text-ink sm:text-[1.625rem]">What this is not</h3>
+        <p className="mt-3 text-base leading-7 text-ink-soft">
           HeatTrick provides research diagnostics only. It is not an official IMD or NDMA
           warning, advisory, forecast, or declaration and must not be used in place of their
           official communications.

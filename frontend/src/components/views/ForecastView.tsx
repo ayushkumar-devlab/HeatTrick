@@ -89,7 +89,7 @@ export function ForecastView({
       <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h3 className="display-title text-xl font-semibold leading-snug text-ink-soft sm:text-2xl">
+            <h3 className="display-title text-[1.375rem] font-semibold leading-snug text-ink-soft sm:text-[1.625rem]">
               {summary}
             </h3>
           </div>
@@ -106,7 +106,7 @@ export function ForecastView({
       </section>
 
       {weatherState.error && (
-        <p className="rounded-xl border border-danger-border bg-danger-soft p-4 text-sm text-danger" role="status">
+        <p className="rounded-xl border border-danger-border bg-danger-soft p-4 text-base leading-7 text-danger" role="status">
           {weatherState.data
             ? 'The latest refresh failed. The previously loaded forecast is still shown.'
             : 'Weather data could not be loaded. Retry to try again.'}
@@ -116,20 +116,20 @@ export function ForecastView({
       {daily && daily.time.length > 0 ? (
         <>
           <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6">
-            <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Daily high and low</h3>
+            <h3 className="display-title text-[1.375rem] font-semibold text-ink sm:text-[1.625rem]">Daily high and low</h3>
             <div className="mt-3">
               <RangeChart
                 days={days}
                 terrain={selectedStation.imdCriteriaType}
               />
             </div>
-            <p className="mt-3 text-sm leading-6 text-muted">
+            <p className="mt-3 text-base leading-7 text-muted">
               Daily extremes come from discrete forecast steps (6-hourly later in the week), so they can understate the true peak; the first and last days can be partial.
             </p>
           </section>
 
           <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6" aria-label="Daily temperature forecast values">
-            <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Daily values</h3>
+            <h3 className="display-title text-[1.375rem] font-semibold text-ink sm:text-[1.625rem]">Daily values</h3>
             <ol className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {days.map((day, index) => {
                 const date = formatLocalDate(day.date)

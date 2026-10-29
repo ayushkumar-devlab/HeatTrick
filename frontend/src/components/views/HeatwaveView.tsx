@@ -233,7 +233,7 @@ export function HeatwaveView({ selectedStation, weatherState }: HeatwaveViewProp
         weatherState={weatherState}
       />
       <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-7">
-        <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Forecast threshold comparison</h3>
+        <h3 className="display-title text-[1.375rem] font-semibold text-ink sm:text-[1.625rem]">Forecast threshold comparison</h3>
         {weatherState.isLoading && !weatherState.data ? (
           <p className="mt-3 text-sm text-muted" role="status">Loading weather data…</p>
         ) : weatherState.error && !weatherState.data ? (
@@ -249,7 +249,7 @@ export function HeatwaveView({ selectedStation, weatherState }: HeatwaveViewProp
                 Forecast classifications could not be calculated: {diagnosisError}
               </p>
             ) : diagnosis?.result.flagged ? (
-              <div className="rounded-lg border border-accent/40 bg-warning-soft p-3 text-sm leading-6 text-warning-ink">
+              <div className="rounded-lg border border-accent/40 bg-warning-soft p-3 text-base leading-7 text-warning-ink">
                 IMD temperature thresholds met across a qualifying consecutive period in this diagnostic forecast window.
                 {diagnosis.result.qualifying_periods.map((period) => (
                   <p key={`${period.start}-${period.end}`} className="mt-1">
@@ -263,7 +263,7 @@ export function HeatwaveView({ selectedStation, weatherState }: HeatwaveViewProp
                 )}
               </div>
             ) : diagnosis && thresholdDays.length > 0 ? (
-              <div className="rounded-lg border border-accent/40 bg-warning-soft p-3 text-sm leading-6 text-warning-ink">
+              <div className="rounded-lg border border-accent/40 bg-warning-soft p-3 text-base leading-7 text-warning-ink">
                 IMD temperature thresholds met on one or more forecast days, but no qualifying consecutive period was identified.
                 {thresholdDays.map((day) => (
                   <p key={day.date} className="mt-1">
@@ -277,22 +277,22 @@ export function HeatwaveView({ selectedStation, weatherState }: HeatwaveViewProp
                 )}
               </div>
             ) : diagnosis && hasCompleteDiagnosis ? (
-              <p className="rounded-lg border border-border bg-surface-alt p-3 text-sm leading-6 text-ink-soft" role="status">
+              <p className="rounded-lg border border-border bg-surface-alt p-3 text-base leading-7 text-ink-soft" role="status">
                 No IMD temperature thresholds met in the forecast window.
               </p>
             ) : (
-              <p className="rounded-lg border border-border bg-surface-alt p-3 text-sm leading-6 text-ink-soft" role="status">
+              <p className="rounded-lg border border-border bg-surface-alt p-3 text-base leading-7 text-ink-soft" role="status">
                 Insufficient data to assess every forecast day; no conclusion can be drawn for the full window.
               </p>
             )}
-            <p className="text-sm leading-6 text-ink-soft">
+            <p className="text-base leading-7 text-ink-soft">
               Based on the available forecast maximum temperatures and climatological normals. This is a model diagnostic, not an official IMD warning.
             </p>
-            <p className="text-sm leading-6 text-warning-ink">
+            <p className="text-base leading-7 text-warning-ink">
               Heat-related health risks may still occur when official heatwave thresholds are not met.
             </p>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[52rem] border-collapse text-left text-sm">
+              <table className="w-full min-w-[52rem] border-collapse text-left text-base">
                 <caption className="sr-only">Forecast daily maximum temperature comparison with terrain thresholds and climatological normals</caption>
                 <thead className="bg-surface-alt">
                   <tr className="border-b border-border text-muted">
@@ -356,8 +356,8 @@ export function HeatwaveView({ selectedStation, weatherState }: HeatwaveViewProp
       </section>
 
       <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6">
-        <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Where the forecast high sits</h3>
-        <p className="mt-1 text-sm text-muted">
+        <h3 className="display-title text-[1.375rem] font-semibold text-ink sm:text-[1.625rem]">Where the forecast high sits</h3>
+        <p className="mt-1 text-base leading-7 text-muted">
           IMD starting line for {selectedStation.imdCriteriaType.toLowerCase()}: {threshold} °C
         </p>
         <div className="mt-3">
@@ -368,13 +368,13 @@ export function HeatwaveView({ selectedStation, weatherState }: HeatwaveViewProp
             ariaLabel={`Weekly forecast peak compared with ${selectedStation.imdCriteriaType.toLowerCase()} heatwave reference thresholds`}
           />
         </div>
-        <p className="mt-2 text-sm leading-6 text-ink-soft">
+        <p className="mt-2 text-base leading-7 text-ink-soft">
           Severe criteria depend on temperature departure from normal; for plains, the IMD table also lists an absolute 47 °C severe level.
         </p>
       </section>
 
       <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6">
-        <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Starting lines by terrain</h3>
+        <h3 className="display-title text-[1.375rem] font-semibold text-ink sm:text-[1.625rem]">Starting lines by terrain</h3>
         <p className="mt-1 text-sm text-muted">The dashed marker is the highest available daily forecast high.</p>
         <div className="mt-3">
           <TerrainThresholds peak={peak} />
@@ -386,7 +386,7 @@ export function HeatwaveView({ selectedStation, weatherState }: HeatwaveViewProp
           Criteria
         </summary>
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[42rem] border-collapse text-left text-sm">
+          <table className="w-full min-w-[42rem] border-collapse text-left text-base">
             <thead>
               <tr className="border-b border-border text-muted">
                 <th className="p-3 font-medium">Terrain</th>

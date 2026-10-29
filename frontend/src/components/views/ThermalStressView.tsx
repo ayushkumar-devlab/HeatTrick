@@ -305,7 +305,7 @@ export function ThermalStressView({ weatherState, selectedStation }: ThermalStre
       />
 
       <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-7">
-        <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Thermal calculations</h3>
+        <h3 className="display-title text-[1.375rem] font-semibold text-ink sm:text-[1.625rem]">Thermal calculations</h3>
         {weatherState.isLoading && !weatherState.data ? (
           <p className="mt-3 text-sm text-muted" role="status">Loading weather data…</p>
         ) : weatherState.error && !weatherState.data ? (
@@ -313,7 +313,7 @@ export function ThermalStressView({ weatherState, selectedStation }: ThermalStre
             Weather data could not be loaded. Retry from the header.
           </p>
         ) : !inputsAvailable ? (
-          <p className="mt-3 rounded-lg border border-border bg-surface-alt p-4 text-sm leading-6 text-ink-soft" role="status">
+          <p className="mt-3 rounded-lg border border-border bg-surface-alt p-4 text-base leading-7 text-ink-soft" role="status">
             Inputs unavailable: this forecast does not include finite air temperature and relative humidity values, so thermal estimates cannot be calculated.
           </p>
         ) : isCalculating ? (
@@ -338,7 +338,7 @@ export function ThermalStressView({ weatherState, selectedStation }: ThermalStre
               <p className="display-title mt-2 text-2xl font-semibold text-ink">
                 {formatValue(result.heat_index.value_c, '°C')}
               </p>
-              <p className="text-sm text-ink-soft">
+              <p className="text-base leading-7 text-ink-soft">
                 {formatValue(result.heat_index.value_f, '°F')} · Heat-index band: {result.heat_index.band}
               </p>
               <p className="mt-2 text-xs text-muted">
@@ -370,14 +370,14 @@ export function ThermalStressView({ weatherState, selectedStation }: ThermalStre
         ) : null}
         {result && (
           <>
-            <p className="mt-4 rounded-lg border border-warning-soft bg-warning-soft p-3 text-sm leading-6 text-warning-ink">
+            <p className="mt-4 rounded-lg border border-warning-soft bg-warning-soft p-3 text-base leading-7 text-warning-ink">
               WBGT is estimated under simplified shade/no-radiation assumptions; it is not a direct measurement.
             </p>
             <details className="mt-4 rounded-lg border border-border bg-surface-alt p-4">
               <summary className="cursor-pointer font-semibold text-brand focus-visible:outline-2 focus-visible:outline-offset-2">
                 How is this calculated?
               </summary>
-              <div className="mt-3 space-y-4 text-sm leading-6 text-ink-soft">
+              <div className="mt-3 space-y-4 text-base leading-7 text-ink-soft">
                 {([
                   ['Heat Index estimate', result.heat_index],
                   ['Wet-Bulb Temperature estimate', result.wet_bulb],
@@ -407,29 +407,29 @@ export function ThermalStressView({ weatherState, selectedStation }: ThermalStre
       </section>
 
       <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6">
-        <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Inputs used for estimates</h3>
-        <p className="mt-1 text-sm text-muted">Values are from the forecast shown above; they are not station observations.</p>
+        <h3 className="display-title text-[1.375rem] font-semibold text-ink sm:text-[1.625rem]">Inputs used for estimates</h3>
+        <p className="mt-2 text-base leading-7 text-muted">Values are from the forecast shown above; they are not station observations.</p>
         <dl className="mt-3 divide-y divide-border">
           <div className="flex items-baseline justify-between gap-3 py-3">
-            <dt className="text-sm text-ink-soft">Air temperature</dt>
+            <dt className="text-base text-ink-soft">Air temperature</dt>
             <dd className="shrink-0 font-semibold tabular-nums text-ink">
               {formatValue(result?.heat_index.inputs.temp_c ?? temperature, '°C')}
             </dd>
           </div>
           <div className="flex items-baseline justify-between gap-3 py-3">
-            <dt className="text-sm text-ink-soft">Relative humidity</dt>
+            <dt className="text-base text-ink-soft">Relative humidity</dt>
             <dd className="shrink-0 font-semibold tabular-nums text-ink">
               {formatValue(result?.heat_index.inputs.rh ?? humidity, '%')}
             </dd>
           </div>
           {dewPoint != null && (
             <div className="flex items-baseline justify-between gap-3 py-3">
-              <dt className="text-sm text-ink-soft">Dew point (derived)</dt>
+              <dt className="text-base text-ink-soft">Dew point (derived)</dt>
               <dd className="shrink-0 font-semibold tabular-nums text-ink">{formatValue(dewPoint, '°C')}</dd>
             </div>
           )}
           <div className="flex items-baseline justify-between gap-3 py-3">
-            <dt className="text-sm text-ink-soft">Wind at 10 m</dt>
+            <dt className="text-base text-ink-soft">Wind at 10 m</dt>
             <dd className="shrink-0 font-semibold tabular-nums text-ink">{formatValue(current?.wind_speed_10m, 'm/s')}</dd>
           </div>
         </dl>

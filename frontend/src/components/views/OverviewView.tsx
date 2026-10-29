@@ -107,24 +107,24 @@ export function OverviewView({
           variant="overview"
         />
         <div className="overview-hero__copy">
-          <h2 className="display-title text-2xl font-semibold leading-tight text-ink sm:text-3xl">
+          <h2 className="display-title text-[1.75rem] font-semibold leading-tight text-ink sm:text-[2.125rem]">
             {headline}
           </h2>
           {initialWeatherLoad ? (
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft" role="status">
+            <p className="mt-2 max-w-2xl text-base leading-7 text-ink-soft" role="status">
               The weather service may take a little time to wake up after inactivity. Your forecast will appear as soon as it responds.
             </p>
           ) : weatherUnavailable ? (
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-danger" role="alert">
+            <p className="mt-2 max-w-2xl text-base leading-7 text-danger" role="alert">
               {weatherState.error} Use Retry in the header to try again.
             </p>
           ) : (
             <>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
+              <p className="mt-2 max-w-2xl text-base leading-7 text-ink-soft">
                 This is a basic threshold comparison, not an official IMD classification.
               </p>
               {verdict.subline !== 'This is a basic threshold comparison, not an official IMD classification.' && (
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">{verdict.subline}</p>
+                <p className="mt-1 max-w-2xl text-base leading-7 text-ink-soft">{verdict.subline}</p>
               )}
             </>
           )}
@@ -170,7 +170,7 @@ export function OverviewView({
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(17rem,1fr)]">
         <section className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="display-title text-xl font-semibold text-ink sm:text-2xl">Daily forecast highs</h3>
+            <h3 className="display-title text-[1.375rem] font-semibold text-ink sm:text-[1.625rem]">Daily forecast highs</h3>
             <button
               type="button"
               onClick={() => onNavigateToTab('forecast')}
