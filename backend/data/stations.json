@@ -61,5 +61,12 @@
     "latitude": 12.9071,
     "longitude": 77.5856,
     "imdCriteriaType": "Plains"
+  },
+  {
+    "id": "MUZ-10",
+    "name": "Muzaffarpur",
+    "latitude": 26.12,
+    "longitude": 85.39,
+    "imdCriteriaType": "Plains"
   }
 ]

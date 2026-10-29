@@ -145,6 +145,31 @@ def test_diagnose_heatwave_unknown_station(climatology_files) -> None:
     assert response.status_code == 404
 
 
+def test_diagnose_heatwave_for_muzaffarpur() -> None:
+    stations = json.loads(science.STATIONS_PATH.read_text(encoding="utf-8"))
+    station = next(entry for entry in stations if entry["id"] == "MUZ-10")
+
+    assert station["name"] == "Muzaffarpur"
+    assert station["latitude"] == 26.12
+    assert station["longitude"] == 85.39
+    normals_path = climatology.CLIMATOLOGY_DIR / "MUZ-10.json"
+    normals_data = json.loads(normals_path.read_text(encoding="utf-8"))
+    assert normals_data["quality"] == "sufficient"
+    assert normals_data["model"] == "era5"
+
+    response = client.post(
+        "/api/heatwave/diagnose",
+        json={
+            "station_id": "MUZ-10",
+            "days": [{"date": "2026-05-01", "tmax_c": 30.0}],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["days"][0]["normal"] == normals_data["normals"]["05-01"]
+    assert response.json()["basis"]["baseline"] == "1991-2020"
+
+
 @pytest.mark.parametrize(
     "body",
     [

@@ -97,4 +97,14 @@ export const REFERENCE_STATIONS: Station[] = [
     elevationM: 908,
     imdCriteriaType: 'Plains',
   },
+  {
+    id: 'MUZ-10',
+    name: 'Muzaffarpur',
+    state: 'Bihar',
+    zone: 'Northern Plains',
+    latitude: 26.12,
+    longitude: 85.39,
+    elevationM: 58,
+    imdCriteriaType: 'Plains',
+  },
 ]
